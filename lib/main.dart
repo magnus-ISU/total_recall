@@ -16,36 +16,36 @@ import 'dart:typed_data';
 import "dart:io";
 
 class InfoScreen extends StatelessWidget {
+  const InfoScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     const double height = 20;
-    return Container(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Everything is open-sourced.'),
-            const SizedBox(height: height),
-            InkWell(
-              child: const Text('Code: https://github.com/k2-fsa/sherpa-onnx'),
-              onTap: () => {},
-            ),
-            const SizedBox(height: height),
-            InkWell(
-              child: const Text('Doc: https://k2-fsa.github.io/sherpa/onnx/'),
-              onTap: () => {},
-            ),
-            const SizedBox(height: height),
-            const Text('QQ 群: 744602236'),
-            const SizedBox(height: height),
-            InkWell(
-              child: const Text(
-                  '微信群: https://k2-fsa.github.io/sherpa/social-groups.html'),
-              onTap: () => {},
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('Everything is open-sourced.'),
+          const SizedBox(height: height),
+          InkWell(
+            child: const Text('Code: https://github.com/k2-fsa/sherpa-onnx'),
+            onTap: () => {},
+          ),
+          const SizedBox(height: height),
+          InkWell(
+            child: const Text('Doc: https://k2-fsa.github.io/sherpa/onnx/'),
+            onTap: () => {},
+          ),
+          const SizedBox(height: height),
+          const Text('QQ 群: 744602236'),
+          const SizedBox(height: height),
+          InkWell(
+            child: const Text(
+                '微信群: https://k2-fsa.github.io/sherpa/social-groups.html'),
+            onTap: () => {},
+          ),
+        ],
       ),
     );
   }
@@ -86,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int _currentIndex = 0;
   final List<Widget> _tabs = [
     const StreamingAsrScreen(),
-    InfoScreen(),
+    const InfoScreen(),
   ];
   @override
   Widget build(BuildContext context) {
@@ -365,13 +365,11 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
 
 
 // Copy the asset file from src to dst
-Future<String> copyAssetFile(String src, [String? dst]) async {
+Future<String> copyAssetFile(String src) async {
   final Directory directory = await getApplicationDocumentsDirectory();
-  if (dst == null) {
-    dst = basename(src);
-  }
+  final dst = basename(src);
   final target = join(directory.path, dst);
-  bool exists = await new File(target).exists();
+  bool exists = await File(target).exists();
 
   final data = await rootBundle.load(src);
 
