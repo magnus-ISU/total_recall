@@ -5,14 +5,11 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
-import 'dart:typed_data';
 import "dart:io";
 
 class InfoScreen extends StatelessWidget {
@@ -366,9 +363,9 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
 
 // Copy the asset file from src to dst
 Future<String> copyAssetFile(String src) async {
-  final Directory directory = await getApplicationDocumentsDirectory();
-  final dst = basename(src);
-  final target = join(directory.path, dst);
+  final Directory directory = await p.getApplicationDocumentsDirectory();
+  final dst = p.basename(src);
+  final target = p.join(directory.path, dst);
   bool exists = await File(target).exists();
 
   final data = await rootBundle.load(src);
