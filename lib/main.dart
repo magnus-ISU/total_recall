@@ -1,4 +1,3 @@
-// Copyright (c)  2024  Xiaomi Corporation
 import 'package:flutter/material.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
@@ -47,8 +46,6 @@ class InfoScreen extends StatelessWidget {
     );
   }
 }
-
-// Copyright (c)  2024  Xiaomi Corporation
 
 void main() {
   runApp(const MyApp());
@@ -115,7 +112,6 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 // Remember to change `assets` in ../pubspec.yaml
-// and download files to ../assets
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
       const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
       return sherpa_onnx.OnlineModelConfig(
@@ -131,8 +127,6 @@ Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
         modelType: 'zipformer2',
       );
 }
-
-// Copyright (c)  2024  Xiaomi Corporation
 
 Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
   final modelConfig = await getOnlineModelConfig();
