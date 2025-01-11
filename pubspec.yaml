@@ -14,19 +14,16 @@ dependencies:
     cupertino_icons: ^1.0.2
     sherpa_onnx: ^1.10.38
     path_provider: ^2.1.4
-    flutter_recorder: ^0.9.3
+    flutter_recorder: ^0.9.4
+    path: ^1.9.1
 
 dev_dependencies:
-    flutter_test:
-        sdk: flutter
-
-    flutter_lints: ^2.0.0
+    flutter_lints: ^5.0.0
 
 flutter:
     uses-material-design: true
 
     assets:
-        - sherpa-onnx-streaming-zipformer-en-2023-06-26/bpe.model
-        - sherpa-onnx-streaming-zipformer-en-2023-06-26/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
-        - sherpa-onnx-streaming-zipformer-en-2023-06-26/decoder-epoch-99-avg-1-chunk-16-left-128.onnx
-        - sherpa-onnx-streaming-zipformer-en-2023-06-26/joiner-epoch-99-avg-1-chunk-16-left-128.onnx
+        - assets/sherpa-onnx-streaming-zipformer-en-2023-06-26/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+        - assets/sherpa-onnx-streaming-zipformer-en-2023-06-26/decoder-epoch-99-avg-1-chunk-16-left-128.onnx
+        - assets/sherpa-onnx-streaming-zipformer-en-2023-06-26/joiner-epoch-99-avg-1-chunk-16-left-128.onnx

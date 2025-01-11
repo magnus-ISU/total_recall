@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
@@ -111,7 +111,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-// Remember to change `assets` in ../pubspec.yaml
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
       const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
       return sherpa_onnx.OnlineModelConfig(
@@ -147,7 +146,7 @@ class StreamingAsrScreen extends StatefulWidget {
 
 class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
   late final TextEditingController _controller;
-  late final AudioRecorder _audioRecorder;
+  late final Recorder _audioRecorder;
 
   final String _title = 'Real-time speech recognition';
   String _last = '';
@@ -158,17 +157,10 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
   sherpa_onnx.OnlineStream? _stream;
   final int _sampleRate = 16000;
 
-  StreamSubscription<RecordState>? _recordSub;
-  RecordState _recordState = RecordState.stop;
-
   @override
   void initState() {
-    _audioRecorder = AudioRecorder();
+    _audioRecorder = Recorder.instance;
     _controller = TextEditingController();
-
-    _recordSub = _audioRecorder.onStateChanged().listen((recordState) {
-      _updateRecordState(recordState);
-    });
 
     super.initState();
   }
@@ -183,28 +175,21 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     }
 
     try {
-      if (await _audioRecorder.hasPermission()) {
-        const encoder = AudioEncoder.pcm16bits;
-
-        if (!await _isEncoderSupported(encoder)) {
-          return;
-        }
-
-        final devs = await _audioRecorder.listInputDevices();
+        final devs = Recorder.instance.listCaptureDevices();
         debugPrint(devs.toString());
 
-        const config = RecordConfig(
-          encoder: encoder,
-          sampleRate: 16000,
-          numChannels: 1,
-        );
+		Recorder.instance.init(
+			format: PCMFormat.f32le,
+			sampleRate: 16000,
+			channels: RecorderChannels.mono,
+		);
 
-        final stream = await _audioRecorder.startStream(config);
+        Recorder.instance.startStreamingData();
 
-        stream.listen(
-          (data) {
-            final samplesFloat32 =
-                convertBytesToFloat32(Uint8List.fromList(data));
+        Recorder.instance.uint8ListStream.listen(
+          (audioDataContainer) {
+		 final data = audioDataContainer.rawData;
+            final samplesFloat32 = convertBytesToFloat32(data);
 
             _stream!.acceptWaveform(
                 samples: samplesFloat32, sampleRate: _sampleRate);
@@ -239,45 +224,10 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
             print('stream stopped.');
           },
         );
-      }
     } catch (e) {
       print(e);
     }
-  }
-
-  Future<void> _stop() async {
-    _stream!.free();
-    _stream = _recognizer!.createStream();
-
-    await _audioRecorder.stop();
-  }
-
-  Future<void> _pause() => _audioRecorder.pause();
-
-  Future<void> _resume() => _audioRecorder.resume();
-
-  void _updateRecordState(RecordState recordState) {
-    setState(() => _recordState = recordState);
-  }
-
-  Future<bool> _isEncoderSupported(AudioEncoder encoder) async {
-    final isSupported = await _audioRecorder.isEncoderSupported(
-      encoder,
-    );
-
-    if (!isSupported) {
-      debugPrint('${encoder.name} is not supported on this platform.');
-      debugPrint('Supported encoders are:');
-
-      for (final e in AudioEncoder.values) {
-        if (await _audioRecorder.isEncoderSupported(e)) {
-          debugPrint('- ${encoder.name}');
-        }
-      }
-    }
-
-    return isSupported;
-  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -312,8 +262,6 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
 
   @override
   void dispose() {
-    _recordSub?.cancel();
-    _audioRecorder.dispose();
     _stream?.free();
     _recognizer?.free();
     super.dispose();
@@ -323,41 +271,28 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     late Icon icon;
     late Color color;
 
-    if (_recordState != RecordState.stop) {
       icon = const Icon(Icons.stop, color: Colors.red, size: 30);
-      color = Colors.red.withOpacity(0.1);
-    } else {
-      final theme = Theme.of(context);
-      icon = Icon(Icons.mic, color: theme.primaryColor, size: 30);
-      color = theme.primaryColor.withOpacity(0.1);
-    }
+      color = Colors.red;
 
     return ClipOval(
       child: Material(
         color: color,
         child: InkWell(
           child: SizedBox(width: 56, height: 56, child: icon),
-          onTap: () {
-            (_recordState != RecordState.stop) ? _stop() : _start();
-          },
         ),
       ),
     );
   }
 
   Widget _buildText() {
-    if (_recordState == RecordState.stop) {
       return const Text("Start");
-    } else {
-      return const Text("Stop");
-    }
   }
 }
 
 
 // Copy the asset file from src to dst
 Future<String> copyAssetFile(String src) async {
-  final Directory directory = await p.getApplicationDocumentsDirectory();
+  final Directory directory = await getApplicationDocumentsDirectory();
   final dst = p.basename(src);
   final target = p.join(directory.path, dst);
   bool exists = await File(target).exists();
