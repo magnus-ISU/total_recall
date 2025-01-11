@@ -11,42 +11,6 @@ import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import "dart:io";
 
-class InfoScreen extends StatelessWidget {
-  const InfoScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    const double height = 20;
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text('Everything is open-sourced.'),
-          const SizedBox(height: height),
-          InkWell(
-            child: const Text('Code: https://github.com/k2-fsa/sherpa-onnx'),
-            onTap: () => {},
-          ),
-          const SizedBox(height: height),
-          InkWell(
-            child: const Text('Doc: https://k2-fsa.github.io/sherpa/onnx/'),
-            onTap: () => {},
-          ),
-          const SizedBox(height: height),
-          const Text('QQ 群: 744602236'),
-          const SizedBox(height: height),
-          InkWell(
-            child: const Text(
-                '微信群: https://k2-fsa.github.io/sherpa/social-groups.html'),
-            onTap: () => {},
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 void main() {
   runApp(const MyApp());
 }
@@ -80,7 +44,6 @@ class _MyHomePageState extends State<MyHomePage> {
   int _currentIndex = 0;
   final List<Widget> _tabs = [
     const StreamingAsrScreen(),
-    const InfoScreen(),
   ];
   @override
   Widget build(BuildContext context) {
@@ -100,10 +63,6 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.info),
-            label: 'Info',
           ),
         ],
       ),
@@ -146,7 +105,6 @@ class StreamingAsrScreen extends StatefulWidget {
 
 class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
   late final TextEditingController _controller;
-  late final Recorder _audioRecorder;
 
   final String _title = 'Real-time speech recognition';
   String _last = '';
@@ -159,7 +117,6 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
 
   @override
   void initState() {
-    _audioRecorder = Recorder.instance;
     _controller = TextEditingController();
 
     super.initState();
@@ -221,11 +178,11 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
             );
           },
           onDone: () {
-            print('stream stopped.');
+            debugPrint('stream stopped.');
           },
         );
     } catch (e) {
-      print(e);
+      debugPrint(e.toString());
     }
 }
 
