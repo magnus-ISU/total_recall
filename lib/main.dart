@@ -136,7 +136,7 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       }
 
       await Recorder.instance.init(
-        format: PCMFormat.s16le,
+        format: PCMFormat.f32le,
         sampleRate: 16000,
         channels: RecorderChannels.mono,
       );
@@ -257,7 +257,7 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
   }
 }
 
-// Copy the asset file from src to dst
+// Copy the asset file from src to Documents
 Future<String> copyAssetFile(String src) async {
   final Directory directory = await getApplicationDocumentsDirectory();
   final dst = p.basename(src);
@@ -275,15 +275,10 @@ Future<String> copyAssetFile(String src) async {
   return target;
 }
 
-Float32List convertBytesToFloat32(Uint8List bytes, [endian = Endian.little]) {
-  final values = Float32List(bytes.length ~/ 2);
+Float32List convertBytesToFloat32(Uint8List bytes) {
+  // Use the Float32List constructor directly on the Uint8List buffer
+  final values = Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
 
-  final data = ByteData.view(bytes.buffer);
-
-  for (var i = 0; i < bytes.length; i += 2) {
-    int short = data.getInt16(i, endian);
-    values[i ~/ 2] = short / 32768.0;
-  }
-
+  // If the system's endianness matches the provided endian, return directly
   return values;
 }
