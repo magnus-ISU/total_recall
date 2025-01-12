@@ -141,14 +141,6 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       final captureDevices = Recorder.instance.listCaptureDevices();
       debugPrint(captureDevices.toString());
 
-      Recorder.instance.init(
-        format: PCMFormat.f32le,
-        sampleRate: 16000,
-        channels: RecorderChannels.mono,
-      );
-
-      Recorder.instance.startStreamingData();
-
       Recorder.instance.uint8ListStream.listen(
         (audioDataContainer) {
           final data = audioDataContainer.rawData;
@@ -191,6 +183,8 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     } catch (e) {
       debugPrint(e.toString());
     }
+
+      Recorder.instance.startStreamingData();
   }
 
   @override
