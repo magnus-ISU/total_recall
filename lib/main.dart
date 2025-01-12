@@ -71,19 +71,19 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
-      const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
-      return sherpa_onnx.OnlineModelConfig(
-        transducer: sherpa_onnx.OnlineTransducerModelConfig(
-          encoder: await copyAssetFile(
-              '$modelDir/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx'),
-          decoder: await copyAssetFile(
-              '$modelDir/decoder-epoch-99-avg-1-chunk-16-left-128.onnx'),
-          joiner: await copyAssetFile(
-              '$modelDir/joiner-epoch-99-avg-1-chunk-16-left-128.onnx'),
-        ),
-        tokens: await copyAssetFile('$modelDir/tokens.txt'),
-        modelType: 'zipformer2',
-      );
+  const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
+  return sherpa_onnx.OnlineModelConfig(
+    transducer: sherpa_onnx.OnlineTransducerModelConfig(
+      encoder: await copyAssetFile(
+          '$modelDir/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx'),
+      decoder: await copyAssetFile(
+          '$modelDir/decoder-epoch-99-avg-1-chunk-16-left-128.onnx'),
+      joiner: await copyAssetFile(
+          '$modelDir/joiner-epoch-99-avg-1-chunk-16-left-128.onnx'),
+    ),
+    tokens: await copyAssetFile('$modelDir/tokens.txt'),
+    modelType: 'zipformer2',
+  );
 }
 
 Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
@@ -132,59 +132,60 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     }
 
     try {
-        final devs = Recorder.instance.listCaptureDevices();
-        debugPrint(devs.toString());
+      final captureDevices = Recorder.instance.listCaptureDevices();
+      debugPrint(captureDevices.toString());
 
-		Recorder.instance.init(
-			format: PCMFormat.f32le,
-			sampleRate: 16000,
-			channels: RecorderChannels.mono,
-		);
+      Recorder.instance.init(
+        format: PCMFormat.f32le,
+        sampleRate: 16000,
+        channels: RecorderChannels.mono,
+      );
 
-        Recorder.instance.startStreamingData();
+      Recorder.instance.startStreamingData();
 
-        Recorder.instance.uint8ListStream.listen(
-          (audioDataContainer) {
-		 final data = audioDataContainer.rawData;
-            final samplesFloat32 = convertBytesToFloat32(data);
+      Recorder.instance.uint8ListStream.listen(
+        (audioDataContainer) {
+          final data = audioDataContainer.rawData;
+		  debugPrint("Samples: $data");
+          final samplesFloat32 = convertBytesToFloat32(data);
+		  debugPrint("f32: $samplesFloat32");
 
-            _stream!.acceptWaveform(
-                samples: samplesFloat32, sampleRate: _sampleRate);
-            while (_recognizer!.isReady(_stream!)) {
-              _recognizer!.decode(_stream!);
+          _stream!.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
+          while (_recognizer!.isReady(_stream!)) {
+            _recognizer!.decode(_stream!);
+          }
+          final text = _recognizer!.getResult(_stream!).text;
+          String textToDisplay = _last;
+          if (text != '') {
+            if (_last == '') {
+              textToDisplay = '$_index: $text';
+            } else {
+              textToDisplay = '$_index: $text\n$_last';
             }
-            final text = _recognizer!.getResult(_stream!).text;
-            String textToDisplay = _last;
+          }
+
+          if (_recognizer!.isEndpoint(_stream!)) {
+            _recognizer!.reset(_stream!);
             if (text != '') {
-              if (_last == '') {
-                textToDisplay = '$_index: $text';
-              } else {
-                textToDisplay = '$_index: $text\n$_last';
-              }
+              _last = textToDisplay;
+              _index += 1;
             }
+          }
+          debugPrint('text: $textToDisplay');
 
-            if (_recognizer!.isEndpoint(_stream!)) {
-              _recognizer!.reset(_stream!);
-              if (text != '') {
-                _last = textToDisplay;
-                _index += 1;
-              }
-            }
-            // print('text: $textToDisplay');
-
-            _controller.value = TextEditingValue(
-              text: textToDisplay,
-              selection: TextSelection.collapsed(offset: textToDisplay.length),
-            );
-          },
-          onDone: () {
-            debugPrint('stream stopped.');
-          },
-        );
+          _controller.value = TextEditingValue(
+            text: textToDisplay,
+            selection: TextSelection.collapsed(offset: textToDisplay.length),
+          );
+        },
+        onDone: () {
+          debugPrint('stream stopped.');
+        },
+      );
     } catch (e) {
       debugPrint(e.toString());
     }
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,24 +229,24 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     late Icon icon;
     late Color color;
 
-      icon = const Icon(Icons.stop, color: Colors.red, size: 30);
-      color = Colors.red;
+    icon = const Icon(Icons.stop, color: Colors.red, size: 30);
+    color = Colors.red;
 
     return ClipOval(
       child: Material(
         color: color,
         child: InkWell(
           child: SizedBox(width: 56, height: 56, child: icon),
+          onTap: () => _start(),
         ),
       ),
     );
   }
 
   Widget _buildText() {
-      return const Text("Start");
+    return const Text("Start");
   }
 }
-
 
 // Copy the asset file from src to dst
 Future<String> copyAssetFile(String src) async {
@@ -277,4 +278,3 @@ Float32List convertBytesToFloat32(Uint8List bytes, [endian = Endian.little]) {
 
   return values;
 }
-
