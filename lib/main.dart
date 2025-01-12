@@ -1,12 +1,10 @@
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
-
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import "dart:io";
@@ -127,6 +125,14 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       sherpa_onnx.initBindings();
       _recognizer = await createOnlineRecognizer();
       _stream = _recognizer?.createStream();
+	  
+	  await [Permission.microphone].request();
+
+      Recorder.instance.init(
+        format: PCMFormat.s16le,
+        sampleRate: 16000,
+        channels: RecorderChannels.mono,
+      );
 
       _isInitialized = true;
     }
