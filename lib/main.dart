@@ -19,52 +19,140 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Next-gen Kaldi flutter demo',
+      title: 'Total Recall',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Next-gen Kaldi with Flutter'),
+      home: const TranscriptionScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
+class TranscriptionScreen extends StatefulWidget {
+  const TranscriptionScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TranscriptionScreen> createState() => _TranscriptionScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _currentIndex = 0;
-  final List<Widget> _tabs = [
-    const StreamingAsrScreen(),
-  ];
+class _TranscriptionScreenState extends State<TranscriptionScreen> {
+  late final TextEditingController _controller;
+  String _last = '';
+  int _index = 0;
+  bool _isInitialized = false;
+
+  late sherpa_onnx.OnlineRecognizer _recognizer;
+  late sherpa_onnx.OnlineStream _stream;
+  final int _sampleRate = 16000;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _initializeAndStart();
+  }
+
+  Future<void> _initializeAndStart() async {
+    if (!_isInitialized) {
+      sherpa_onnx.initBindings();
+      _recognizer = await createOnlineRecognizer();
+      _stream = _recognizer.createStream();
+
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS) {
+        var permissionStatus = await Permission.microphone.request();
+        if (permissionStatus.isDenied) {
+          // Handle permission denied case
+          return;
+        }
+      }
+
+      await Recorder.instance.init(
+        format: PCMFormat.f32le,
+        sampleRate: 16000,
+        channels: RecorderChannels.mono,
+      );
+      
+      _isInitialized = true;
+      await _startTranscription();
+    }
+  }
+
+  Future<void> _startTranscription() async {
+    try {
+      Recorder.instance.start();
+      
+      Recorder.instance.uint8ListStream.listen(
+        (audioDataContainer) {
+          final data = audioDataContainer.rawData;
+          final samplesFloat32 = bytesAsFloat32(data);
+
+          _stream.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
+          while (_recognizer.isReady(_stream)) {
+            _recognizer.decode(_stream);
+          }
+          final text = _recognizer.getResult(_stream).text;
+          String textToDisplay = _last;
+          if (text != '') {
+            if (_last == '') {
+              textToDisplay = '$_index: $text';
+            } else {
+              textToDisplay = '$_index: $text\n$_last';
+            }
+          }
+
+          if (_recognizer.isEndpoint(_stream)) {
+            _recognizer.reset(_stream);
+            if (text != '') {
+              _last = textToDisplay;
+              _index += 1;
+            }
+          }
+
+          _controller.value = TextEditingValue(
+            text: textToDisplay,
+            selection: TextSelection.collapsed(offset: textToDisplay.length),
+          );
+        },
+        onDone: () {
+          debugPrint('stream stopped.');
+        },
+      );
+
+      Recorder.instance.startStreamingData();
+    } catch (e) {
+      debugPrint('Error starting transcription: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text('Live Transcription'),
       ),
-      body: _tabs[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: TextField(
+          maxLines: null,
+          controller: _controller,
+          readOnly: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Transcription will appear here...',
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _stream.free();
+    _recognizer.free();
+    _controller.dispose();
+    super.dispose();
   }
 }
 
@@ -94,168 +182,6 @@ Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
   return sherpa_onnx.OnlineRecognizer(config);
 }
 
-class StreamingAsrScreen extends StatefulWidget {
-  const StreamingAsrScreen({super.key});
-
-  @override
-  State<StreamingAsrScreen> createState() => _StreamingAsrScreenState();
-}
-
-class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
-  late final TextEditingController _controller;
-
-  final String _title = 'Real-time speech recognition';
-  String _last = '';
-  int _index = 0;
-  bool _isInitialized = false;
-
-  late sherpa_onnx.OnlineRecognizer _recognizer;
-  late sherpa_onnx.OnlineStream _stream;
-  final int _sampleRate = 16000;
-
-  @override
-  void initState() {
-    _controller = TextEditingController();
-
-    super.initState();
-  }
-
-  Future<void> _start() async {
-    if (!_isInitialized) {
-      sherpa_onnx.initBindings();
-      _recognizer = await createOnlineRecognizer();
-      _stream = _recognizer.createStream();
-
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS) {
-        Permission.microphone.request().isGranted.then((value) async {
-          if (!value) {
-            await [Permission.microphone].request();
-          }
-        });
-      }
-
-      await Recorder.instance.init(
-        format: PCMFormat.f32le,
-        sampleRate: 16000,
-        channels: RecorderChannels.mono,
-      );
-      Recorder.instance.start();
-
-      _isInitialized = true;
-    }
-
-    try {
-      final captureDevices = Recorder.instance.listCaptureDevices();
-      debugPrint(captureDevices.toString());
-
-      Recorder.instance.uint8ListStream.listen(
-        (audioDataContainer) {
-          final data = audioDataContainer.rawData;
-          final samplesFloat32 = bytesAsFloat32(data);
-
-          _stream
-              .acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
-          while (_recognizer!.isReady(_stream)) {
-            _recognizer!.decode(_stream);
-          }
-          final text = _recognizer.getResult(_stream).text;
-          String textToDisplay = _last;
-          if (text != '') {
-            if (_last == '') {
-              textToDisplay = '$_index: $text';
-            } else {
-              textToDisplay = '$_index: $text\n$_last';
-            }
-          }
-
-          if (_recognizer.isEndpoint(_stream)) {
-            _recognizer.reset(_stream);
-            if (text != '') {
-              _last = textToDisplay;
-              _index += 1;
-            }
-          }
-          debugPrint('text: $textToDisplay');
-
-          _controller.value = TextEditingValue(
-            text: textToDisplay,
-            selection: TextSelection.collapsed(offset: textToDisplay.length),
-          );
-        },
-        onDone: () {
-          debugPrint('stream stopped.');
-        },
-      );
-    } catch (e) {
-      debugPrint(e.toString());
-    }
-
-    Recorder.instance.startStreamingData();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text(_title),
-        ),
-        body: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: 50),
-            TextField(
-              maxLines: 5,
-              controller: _controller,
-              readOnly: true,
-            ),
-            const SizedBox(height: 50),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                _buildRecordStopControl(),
-                const SizedBox(width: 20),
-                _buildText(),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _stream.free();
-    _recognizer.free();
-    super.dispose();
-  }
-
-  Widget _buildRecordStopControl() {
-    late Icon icon;
-    late Color color;
-
-    icon = const Icon(Icons.stop, color: Colors.red, size: 30);
-    color = Colors.red;
-
-    return ClipOval(
-      child: Material(
-        color: color,
-        child: InkWell(
-          child: SizedBox(width: 56, height: 56, child: icon),
-          onTap: () => _start(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildText() {
-    return const Text("Start");
-  }
-}
-
-// Copy the asset file from src to Documents
 Future<String> copyAssetFile(String src) async {
   final Directory directory = await getApplicationDocumentsDirectory();
   final dst = p.basename(src);
@@ -274,10 +200,7 @@ Future<String> copyAssetFile(String src) async {
 }
 
 Float32List bytesAsFloat32(Uint8List bytes) {
-  // Use the Float32List constructor directly on the Uint8List buffer
   final values =
       Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
-
-  // Endianness is expected to be le for the model and the recorder, so return the view directly without allocating
   return values;
 }
