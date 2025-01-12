@@ -109,8 +109,8 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
   int _index = 0;
   bool _isInitialized = false;
 
-  sherpa_onnx.OnlineRecognizer? _recognizer;
-  sherpa_onnx.OnlineStream? _stream;
+  late sherpa_onnx.OnlineRecognizer _recognizer;
+  late sherpa_onnx.OnlineStream _stream;
   final int _sampleRate = 16000;
 
   @override
@@ -124,7 +124,7 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
     if (!_isInitialized) {
       sherpa_onnx.initBindings();
       _recognizer = await createOnlineRecognizer();
-      _stream = _recognizer?.createStream();
+      _stream = _recognizer.createStream();
 
       if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) {
@@ -152,16 +152,14 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       Recorder.instance.uint8ListStream.listen(
         (audioDataContainer) {
           final data = audioDataContainer.rawData;
-          debugPrint("Samples: $data");
-          final samplesFloat32 = convertBytesToFloat32(data);
-          debugPrint("f32: $samplesFloat32");
+          final samplesFloat32 = bytesAsFloat32(data);
 
-          _stream!
+          _stream
               .acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
-          while (_recognizer!.isReady(_stream!)) {
-            _recognizer!.decode(_stream!);
+          while (_recognizer!.isReady(_stream)) {
+            _recognizer!.decode(_stream);
           }
-          final text = _recognizer!.getResult(_stream!).text;
+          final text = _recognizer.getResult(_stream).text;
           String textToDisplay = _last;
           if (text != '') {
             if (_last == '') {
@@ -171,8 +169,8 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
             }
           }
 
-          if (_recognizer!.isEndpoint(_stream!)) {
-            _recognizer!.reset(_stream!);
+          if (_recognizer.isEndpoint(_stream)) {
+            _recognizer.reset(_stream);
             if (text != '') {
               _last = textToDisplay;
               _index += 1;
@@ -229,8 +227,8 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
 
   @override
   void dispose() {
-    _stream?.free();
-    _recognizer?.free();
+    _stream.free();
+    _recognizer.free();
     super.dispose();
   }
 
@@ -275,10 +273,11 @@ Future<String> copyAssetFile(String src) async {
   return target;
 }
 
-Float32List convertBytesToFloat32(Uint8List bytes) {
+Float32List bytesAsFloat32(Uint8List bytes) {
   // Use the Float32List constructor directly on the Uint8List buffer
-  final values = Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
+  final values =
+      Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
 
-  // If the system's endianness matches the provided endian, return directly
+  // Endianness is expected to be le for the model and the recorder, so return the view directly without allocating
   return values;
 }
