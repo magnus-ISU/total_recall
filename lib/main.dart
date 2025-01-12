@@ -1,16 +1,153 @@
+import 'dart:ui';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
-import "dart:io";
+import 'dart:io';
 
-void main() {
+// Notification channel details
+const notificationChannelId = 'transcription_service';
+const notificationId = 888;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isAndroid || Platform.isIOS) {
+    await initializeBackgroundService();
+  }
+
   runApp(const MyApp());
+}
+
+Future<void> initializeBackgroundService() async {
+  final service = FlutterBackgroundService();
+
+  // Configure notifications for Android
+  if (Platform.isAndroid) {
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      notificationChannelId,
+      'Transcription Service',
+      description: 'Running speech recognition in background',
+      importance: Importance.low,
+    );
+
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+
+  await service.configure(
+    iosConfiguration: IosConfiguration(
+      autoStart: true,
+      onForeground: onStart,
+      onBackground: onIosBackground,
+    ),
+    androidConfiguration: AndroidConfiguration(
+      onStart: onStart,
+      autoStart: true,
+      isForegroundMode: true,
+      notificationChannelId: notificationChannelId,
+      initialNotificationTitle: 'Transcription Service',
+      initialNotificationContent: 'Initializing...',
+      foregroundServiceNotificationId: notificationId,
+      autoStartOnBoot: true,
+    ),
+  );
+}
+
+@pragma('vm:entry-point')
+Future<bool> onIosBackground(ServiceInstance service) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  return true;
+}
+
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  DartPluginRegistrant.ensureInitialized();
+
+  // Initialize recognizer and stream
+  sherpa_onnx.initBindings();
+  final recognizer = await createOnlineRecognizer();
+  final stream = recognizer.createStream();
+
+  // Request microphone permission if needed
+  if (Platform.isAndroid || Platform.isIOS) {
+    await Permission.microphone.request();
+  }
+
+  // Initialize recorder
+  await Recorder.instance.init(
+    format: PCMFormat.f32le,
+    sampleRate: 16000,
+    channels: RecorderChannels.mono,
+  );
+
+  // Start recording
+  Recorder.instance.start();
+
+  // Setup transcription stream
+  // The background service sends sentences while they are being updated, and then an empty string when it sees an endpoint
+  Recorder.instance.uint8ListStream.listen(
+    (audioDataContainer) {
+      final data = audioDataContainer.rawData;
+      final samplesFloat32 = bytesAsFloat32(data);
+
+      stream.acceptWaveform(samples: samplesFloat32, sampleRate: 16000);
+      while (recognizer.isReady(stream)) {
+        recognizer.decode(stream);
+      }
+
+      final text = recognizer.getResult(stream).text;
+      bool isEndpoint = recognizer.isEndpoint(stream);
+      if (text.isNotEmpty || isEndpoint) {
+        // Update notification with latest transcription
+        if (service is AndroidServiceInstance) {
+          service.setForegroundNotificationInfo(
+            title: 'Transcription Active',
+            content: text,
+          );
+        }
+
+        // Broadcast transcription to app if it's running
+        service.invoke(
+          'transcription',
+          {
+            'text': text,
+            'timestamp': DateTime.now().toIso8601String(),
+            'isEndpoint': isEndpoint,
+          },
+        );
+      }
+
+      if (isEndpoint) {
+        recognizer.reset(stream);
+      }
+    },
+    onDone: () {
+      debugPrint('Stream stopped');
+    },
+  );
+
+  Recorder.instance.startStreamingData();
+
+  // Handle stop command
+  service.on('stop').listen((event) {
+    stream.free();
+    recognizer.free();
+    service.stopSelf();
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -19,7 +156,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Total Recall',
+      title: 'Transcription App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -37,76 +174,37 @@ class TranscriptionScreen extends StatefulWidget {
 }
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
-  late final TextEditingController _controller;
-  String _last = '';
-  int _index = 0;
-  bool _isInitialized = false;
-
-  late sherpa_onnx.OnlineRecognizer _recognizer;
-  late sherpa_onnx.OnlineStream _stream;
-  final int _sampleRate = 16000;
+  final TextEditingController _controller = TextEditingController();
+  final List<String> _previousFullSentences = [];
+  int _sentenceIndex = 0;
+  late final FlutterBackgroundService _service;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
-    _initializeAndStart();
+    _initializeApp();
   }
 
-  Future<void> _initializeAndStart() async {
-    if (!_isInitialized) {
-      sherpa_onnx.initBindings();
-      _recognizer = await createOnlineRecognizer();
-      _stream = _recognizer.createStream();
+  Future<void> _initializeApp() async {
+    _service = FlutterBackgroundService();
 
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS) {
-        var permissionStatus = await Permission.microphone.request();
-        if (permissionStatus.isDenied) {
-          // Handle permission denied case
-          return;
-        }
-      }
+    if (Platform.isAndroid || Platform.isIOS) {
+      // For mobile platforms, listen to background service updates
+      _service.on('transcription').listen((event) {
+        if (event != null) {
+          final text = event['text'] as String;
+          final isEndpoint = event['isEndpoint'] as bool;
 
-      await Recorder.instance.init(
-        format: PCMFormat.f32le,
-        sampleRate: 16000,
-        channels: RecorderChannels.mono,
-      );
-      
-      _isInitialized = true;
-      await _startTranscription();
-    }
-  }
-
-  Future<void> _startTranscription() async {
-    try {
-      Recorder.instance.start();
-      
-      Recorder.instance.uint8ListStream.listen(
-        (audioDataContainer) {
-          final data = audioDataContainer.rawData;
-          final samplesFloat32 = bytesAsFloat32(data);
-
-          _stream.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
-          while (_recognizer.isReady(_stream)) {
-            _recognizer.decode(_stream);
-          }
-          final text = _recognizer.getResult(_stream).text;
-          String textToDisplay = _last;
-          if (text != '') {
-            if (_last == '') {
-              textToDisplay = '$_index: $text';
-            } else {
-              textToDisplay = '$_index: $text\n$_last';
-            }
+          var textToDisplay = _previousFullSentences.join('\n');
+          var newText = '$_sentenceIndex: $text';
+          if (text.isNotEmpty) {
+            textToDisplay += '\n$newText';
           }
 
-          if (_recognizer.isEndpoint(_stream)) {
-            _recognizer.reset(_stream);
-            if (text != '') {
-              _last = textToDisplay;
-              _index += 1;
+          if (isEndpoint) {
+            if (text.isNotEmpty) {
+              _previousFullSentences.add(newText);
+              _sentenceIndex++;
             }
           }
 
@@ -114,16 +212,63 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
             text: textToDisplay,
             selection: TextSelection.collapsed(offset: textToDisplay.length),
           );
-        },
-        onDone: () {
-          debugPrint('stream stopped.');
-        },
-      );
-
-      Recorder.instance.startStreamingData();
-    } catch (e) {
-      debugPrint('Error starting transcription: $e');
+        }
+      });
+    } else {
+      // For desktop platforms, initialize direct transcription
+      await _initializeDesktopTranscription();
     }
+  }
+
+  Future<void> _initializeDesktopTranscription() async {
+    // Implementation of direct transcription for desktop platforms
+    // This is similar to your original implementation
+    sherpa_onnx.initBindings();
+    final recognizer = await createOnlineRecognizer();
+    final stream = recognizer.createStream();
+
+    await Recorder.instance.init(
+      format: PCMFormat.f32le,
+      sampleRate: 16000,
+      channels: RecorderChannels.mono,
+    );
+
+    Recorder.instance.start();
+
+    Recorder.instance.uint8ListStream.listen(
+      (audioDataContainer) {
+        // Process audio data similarly to the background service
+        final data = audioDataContainer.rawData;
+        final samplesFloat32 = bytesAsFloat32(data);
+
+        stream.acceptWaveform(samples: samplesFloat32, sampleRate: 16000);
+        while (recognizer.isReady(stream)) {
+          recognizer.decode(stream);
+        }
+
+        final text = recognizer.getResult(stream).text;
+        var textToDisplay = _previousFullSentences.join('\n');
+        var newText = '$_sentenceIndex: $text';
+        if (text.isNotEmpty) {
+            textToDisplay += '\n$newText';
+        }
+
+        if (recognizer.isEndpoint(stream)) {
+          recognizer.reset(stream);
+          if (text.isNotEmpty) {
+            _previousFullSentences.add(newText);
+            _sentenceIndex++;
+          }
+        }
+
+        _controller.value = TextEditingValue(
+          text: textToDisplay,
+          selection: TextSelection.collapsed(offset: textToDisplay.length),
+        );
+      },
+    );
+
+    Recorder.instance.startStreamingData();
   }
 
   @override
@@ -149,8 +294,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   @override
   void dispose() {
-    _stream.free();
-    _recognizer.free();
     _controller.dispose();
     super.dispose();
   }

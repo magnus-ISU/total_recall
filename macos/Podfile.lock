@@ -1,4 +1,6 @@
 PODS:
+  - flutter_local_notifications (0.0.1):
+    - FlutterMacOS
   - flutter_recorder (0.0.1):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
@@ -9,12 +11,15 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
   - flutter_recorder (from `Flutter/ephemeral/.symlinks/plugins/flutter_recorder/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - sherpa_onnx_macos (from `Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos`)
 
 EXTERNAL SOURCES:
+  flutter_local_notifications:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos
   flutter_recorder:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_recorder/macos
   FlutterMacOS:
@@ -25,6 +30,7 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos
 
 SPEC CHECKSUMS:
+  flutter_local_notifications: 13862b132e32eb858dea558a86d45d08daeacfe7
   flutter_recorder: 0c523c5f8816d5ebf1ba07383b1025260b72e00c
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
