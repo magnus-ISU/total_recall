@@ -125,14 +125,22 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       sherpa_onnx.initBindings();
       _recognizer = await createOnlineRecognizer();
       _stream = _recognizer?.createStream();
-	  
-	  await [Permission.microphone].request();
 
-      Recorder.instance.init(
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS) {
+        Permission.microphone.request().isGranted.then((value) async {
+          if (!value) {
+            await [Permission.microphone].request();
+          }
+        });
+      }
+
+      await Recorder.instance.init(
         format: PCMFormat.s16le,
         sampleRate: 16000,
         channels: RecorderChannels.mono,
       );
+      Recorder.instance.start();
 
       _isInitialized = true;
     }
@@ -144,11 +152,12 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       Recorder.instance.uint8ListStream.listen(
         (audioDataContainer) {
           final data = audioDataContainer.rawData;
-		  debugPrint("Samples: $data");
+          debugPrint("Samples: $data");
           final samplesFloat32 = convertBytesToFloat32(data);
-		  debugPrint("f32: $samplesFloat32");
+          debugPrint("f32: $samplesFloat32");
 
-          _stream!.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
+          _stream!
+              .acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
           while (_recognizer!.isReady(_stream!)) {
             _recognizer!.decode(_stream!);
           }
@@ -184,7 +193,7 @@ class _StreamingAsrScreenState extends State<StreamingAsrScreen> {
       debugPrint(e.toString());
     }
 
-      Recorder.instance.startStreamingData();
+    Recorder.instance.startStreamingData();
   }
 
   @override
