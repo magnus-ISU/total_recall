@@ -31,80 +31,9 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-Future<void> initializeBackgroundService() async {
-  final service = FlutterBackgroundService();
-
-  // Configure notifications for Android
-  if (Platform.isAndroid) {
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      notificationChannelId,
-      'Transcription Service',
-      description: 'Running speech recognition in background',
-      importance: Importance.low,
-    );
-
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-  }
-
-  await service.configure(
-    iosConfiguration: IosConfiguration(
-      autoStart: true,
-      onForeground: onMobileStart,
-      onBackground: onIosBackground,
-    ),
-    androidConfiguration: AndroidConfiguration(
-      onStart: onMobileStart,
-      autoStart: true,
-      isForegroundMode: true,
-      notificationChannelId: notificationChannelId,
-      initialNotificationTitle: 'Transcription Service',
-      initialNotificationContent: 'Initializing...',
-      foregroundServiceNotificationId: notificationId,
-      autoStartOnBoot: true,
-    ),
-  );
-}
-
-@pragma('vm:entry-point')
-Future<bool> onIosBackground(ServiceInstance service) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  DartPluginRegistrant.ensureInitialized();
-  return true;
-}
-
-@pragma('vm:entry-point')
-void onMobileStart(ServiceInstance service) async {
-  DartPluginRegistrant.ensureInitialized();
-
-  await Permission.microphone.request();
-
-  final processor = await beginTranscription((text, isEndpoint, sentenceIndex) {
-    if (service is AndroidServiceInstance) {
-      service.setForegroundNotificationInfo(
-        title: 'Transcription Active',
-        content: text,
-      );
-      service.invoke(
-        'transcription',
-        {
-          'text': text,
-          'isEndpoint': isEndpoint,
-          'sentenceIndex': sentenceIndex,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-      );
-    }
-  });
-
-  service.on('stop').listen((event) {
-    processor.dispose();
-    service.stopSelf();
-  });
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Main UI
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -203,6 +132,10 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     super.dispose();
   }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Recording and STT
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
   const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
@@ -322,6 +255,10 @@ Future<AudioProcessingService> beginTranscription(
   return audioProcessingService;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// DATABASE
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void createDB() {
   db = sqlite3.openInMemory();
 
@@ -343,4 +280,83 @@ insertMessage(String timestamp, String text) {
 List<(String, String)> getMessages() {
   final ResultSet results = db.select('SELECT timestamp, text FROM messages ORDER BY timestamp DESC');
   return results.map((row) => (row['timestamp'] as String, row['text'] as String)).toList();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Mobile background services
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Future<void> initializeBackgroundService() async {
+  final service = FlutterBackgroundService();
+
+  // Configure notifications for Android
+  if (Platform.isAndroid) {
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      notificationChannelId,
+      'Transcription Service',
+      description: 'Running speech recognition in background',
+      importance: Importance.low,
+    );
+
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+
+  await service.configure(
+    iosConfiguration: IosConfiguration(
+      autoStart: true,
+      onForeground: onMobileStart,
+      onBackground: onIosBackground,
+    ),
+    androidConfiguration: AndroidConfiguration(
+      onStart: onMobileStart,
+      autoStart: true,
+      isForegroundMode: true,
+      notificationChannelId: notificationChannelId,
+      initialNotificationTitle: 'Transcription Service',
+      initialNotificationContent: 'Initializing...',
+      foregroundServiceNotificationId: notificationId,
+      autoStartOnBoot: true,
+    ),
+  );
+}
+
+@pragma('vm:entry-point')
+Future<bool> onIosBackground(ServiceInstance service) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  return true;
+}
+
+@pragma('vm:entry-point')
+void onMobileStart(ServiceInstance service) async {
+  DartPluginRegistrant.ensureInitialized();
+
+  await Permission.microphone.request();
+
+  final processor = await beginTranscription((text, isEndpoint, sentenceIndex) {
+    if (service is AndroidServiceInstance) {
+      service.setForegroundNotificationInfo(
+        title: 'Transcription Active',
+        content: text,
+      );
+      service.invoke(
+        'transcription',
+        {
+          'text': text,
+          'isEndpoint': isEndpoint,
+          'sentenceIndex': sentenceIndex,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    }
+  });
+
+  service.on('stop').listen((event) {
+    processor.dispose();
+    service.stopSelf();
+  });
 }
