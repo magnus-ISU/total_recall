@@ -28,15 +28,15 @@ Future<void> main() async {
     await initializeBackgroundService();
   }
 
-  runApp(const MyApp());
+  runApp(const TotalRecallUI());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Main UI
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class TotalRecallUI extends StatelessWidget {
+  const TotalRecallUI({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -60,27 +60,29 @@ class TranscriptionScreen extends StatefulWidget {
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<String> _previousFullSentences = [];
+  String _previousFullSentences = '';
   late final FlutterBackgroundService _service;
 
   @override
   void initState() {
     super.initState();
     _initializeApp();
-    _previousFullSentences.addAll(getMessages().map((v) => '${v.$1}: ${v.$2}').toList());
+    _previousFullSentences = getMessages().map((v) => '${v.$1}: ${v.$2}').toList().join('\n');
   }
 
   void updateText(String text, bool isEndpoint, int sentenceIndex) {
-    var textToDisplay = _previousFullSentences.join('\n');
-    var newText = '$sentenceIndex: $text';
+    var textToDisplay = _previousFullSentences;
+    var timestamp = DateTime.timestamp().toIso8601String();
+    var newText = '$timestamp: $text';
     if (text.isNotEmpty) {
       textToDisplay += '\n$newText';
     }
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
-        insertMessage(text, DateTime.timestamp().toIso8601String());
-        _previousFullSentences.add(newText);
+        insertMessage(timestamp, text);
+        if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
+        _previousFullSentences += newText;
       }
     }
 
@@ -91,10 +93,9 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   Future<void> _initializeApp() async {
-    _service = FlutterBackgroundService();
-
     if (Platform.isAndroid || Platform.isIOS) {
       // For mobile platforms, listen to background service updates
+      _service = FlutterBackgroundService();
       _service.on('transcription').listen((event) {
         if (event != null) {
           updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
