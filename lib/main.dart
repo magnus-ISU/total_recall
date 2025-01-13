@@ -43,12 +43,10 @@ Future<void> initializeBackgroundService() async {
       importance: Importance.low,
     );
 
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
     await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
   }
 
@@ -140,6 +138,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   void initState() {
     super.initState();
     _initializeApp();
+    _previousFullSentences.addAll(getMessages().map((v) => '${v.$1}: ${v.$2}').toList());
   }
 
   void updateText(String text, bool isEndpoint, int sentenceIndex) {
@@ -151,7 +150,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
-		insertMessage(text, DateTime.timestamp().toIso8601String());
+        insertMessage(text, DateTime.timestamp().toIso8601String());
         _previousFullSentences.add(newText);
       }
     }
@@ -164,15 +163,12 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   Future<void> _initializeApp() async {
     _service = FlutterBackgroundService();
-	
-    _previousFullSentences.addAll(getMessages().map((v) => '${v.$1}: ${v.$2}').toList());
 
     if (Platform.isAndroid || Platform.isIOS) {
       // For mobile platforms, listen to background service updates
       _service.on('transcription').listen((event) {
         if (event != null) {
-          updateText(
-              event['text'], event['isEndpoint'], event['sentenceIndex']);
+          updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
         }
       });
     } else {
@@ -245,8 +241,7 @@ Future<String> copyAssetFile(String src) async {
   final data = await rootBundle.load(src);
 
   if (!exists || File(target).lengthSync() != data.lengthInBytes) {
-    final List<int> bytes =
-        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    final List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(target).writeAsBytes(bytes);
   }
 
@@ -254,16 +249,14 @@ Future<String> copyAssetFile(String src) async {
 }
 
 Float32List bytesAsFloat32(Uint8List bytes) {
-  final values =
-      Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
+  final values = Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
   return values;
 }
 
 class AudioProcessingService {
   final sherpa_onnx.OnlineRecognizer recognizer;
   final sherpa_onnx.OnlineStream stream;
-  final void Function(String text, bool isEndpoint, int processedIndex)
-      onTranscriptionUpdate;
+  final void Function(String text, bool isEndpoint, int processedIndex) onTranscriptionUpdate;
 
   int processedIndex = 0;
 
@@ -302,8 +295,7 @@ class AudioProcessingService {
 }
 
 Future<AudioProcessingService> beginTranscription(
-  final void Function(String text, bool isEndpoint, int processedIndex)
-      onTranscriptionUpdate,
+  final void Function(String text, bool isEndpoint, int processedIndex) onTranscriptionUpdate,
 ) async {
   // Initialize recorder
   await Recorder.instance.init(
@@ -334,18 +326,18 @@ void createDB() {
   db = sqlite3.openInMemory();
 
   db.execute('''create table messages (
-    id integer not null primary key,
     text text not null,
     timestamp text not null,
+    id integer not null primary key
   )''');
 
-  insertMessage('test 1 message', '2024-01-13');
-  insertMessage('test 2 message', '2024-01-12');
+  insertMessage('2024-01-13', 'test 1 message');
+  insertMessage('2024-01-12', 'test 2 message');
 }
 
-final insertMessageSQL = db.prepare('insert into messages (text, timestamp) values (?, ?)');
-insertMessage(String text, String timestamp) {
-  insertMessageSQL.execute([text, timestamp]);
+final insertMessageSQL = db.prepare('insert into messages (timestamp, text) values (?, ?)');
+insertMessage(String timestamp, String text) {
+  insertMessageSQL.execute([timestamp, text]);
 }
 
 List<(String, String)> getMessages() {
