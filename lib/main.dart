@@ -100,7 +100,6 @@ void onMobileStart(ServiceInstance service) async {
 
   // Start recording
   Recorder.instance.uint8ListStream.listen(processor.processAudioData);
-  Recorder.instance.startStreamingData();
 
   // Handle stop command
   service.on('stop').listen((event) {
@@ -176,7 +175,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     final processor = await audioProcessor(updateText);
     Recorder.instance.start();
     Recorder.instance.uint8ListStream.listen(processor.processAudioData);
-    Recorder.instance.startStreamingData();
     }
   }
 
@@ -311,6 +309,7 @@ Future<AudioProcessingService> audioProcessor(
     channels: RecorderChannels.mono,
   );
   Recorder.instance.start();
+  Recorder.instance.startStreamingData();
 
   // Initialize recognizer and stream
   sherpa_onnx.initBindings();
