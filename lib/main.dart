@@ -22,7 +22,7 @@ late Database db;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  db = createDB();
+  createDB();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await initializeBackgroundService();
@@ -82,10 +82,9 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 void onMobileStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
 
-  // Request microphone permission if needed
   await Permission.microphone.request();
 
-  final processor = await audioProcessor((text, isEndpoint, sentenceIndex) {
+  final processor = await beginTranscription((text, isEndpoint, sentenceIndex) {
     if (service is AndroidServiceInstance) {
       service.setForegroundNotificationInfo(
         title: 'Transcription Active',
@@ -103,10 +102,6 @@ void onMobileStart(ServiceInstance service) async {
     }
   });
 
-  // Start recording
-  Recorder.instance.uint8ListStream.listen(processor.processAudioData);
-
-  // Handle stop command
   service.on('stop').listen((event) {
     processor.dispose();
     service.stopSelf();
@@ -156,6 +151,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
+		insertMessage(text, DateTime.timestamp().toIso8601String());
         _previousFullSentences.add(newText);
       }
     }
@@ -168,6 +164,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   Future<void> _initializeApp() async {
     _service = FlutterBackgroundService();
+	
+    _previousFullSentences.addAll(getMessages().map((v) => '${v.$1}: ${v.$2}').toList());
 
     if (Platform.isAndroid || Platform.isIOS) {
       // For mobile platforms, listen to background service updates
@@ -178,9 +176,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
         }
       });
     } else {
-      final processor = await audioProcessor(updateText);
-      Recorder.instance.start();
-      Recorder.instance.uint8ListStream.listen(processor.processAudioData);
+      await beginTranscription(updateText);
     }
   }
 
@@ -305,7 +301,7 @@ class AudioProcessingService {
   }
 }
 
-Future<AudioProcessingService> audioProcessor(
+Future<AudioProcessingService> beginTranscription(
   final void Function(String text, bool isEndpoint, int processedIndex)
       onTranscriptionUpdate,
 ) async {
@@ -323,21 +319,36 @@ Future<AudioProcessingService> audioProcessor(
   final recognizer = await createOnlineRecognizer();
   final stream = recognizer.createStream();
 
-  return AudioProcessingService(
+  final audioProcessingService = AudioProcessingService(
     recognizer: recognizer,
     stream: stream,
     onTranscriptionUpdate: onTranscriptionUpdate,
   );
+
+  Recorder.instance.uint8ListStream.listen(audioProcessingService.processAudioData);
+
+  return audioProcessingService;
 }
 
-Database createDB() {
-  final database = sqlite3.openInMemory();
+void createDB() {
+  db = sqlite3.openInMemory();
 
-  database.execute('''create table messages (
+  db.execute('''create table messages (
     id integer not null primary key,
     text text not null,
     timestamp text not null,
   )''');
 
-  return database;
+  insertMessage('test 1 message', '2024-01-13');
+  insertMessage('test 2 message', '2024-01-12');
+}
+
+final insertMessageSQL = db.prepare('insert into messages (text, timestamp) values (?, ?)');
+insertMessage(String text, String timestamp) {
+  insertMessageSQL.execute([text, timestamp]);
+}
+
+List<(String, String)> getMessages() {
+  final ResultSet results = db.select('SELECT timestamp, text FROM messages ORDER BY timestamp DESC');
+  return results.map((row) => (row['timestamp'] as String, row['text'] as String)).toList();
 }
