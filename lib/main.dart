@@ -21,8 +21,8 @@ late Database db;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  db = sqlite3.openInMemory();
+
+  db = createDB();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await initializeBackgroundService();
@@ -146,24 +146,24 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     super.initState();
     _initializeApp();
   }
-  
+
   void updateText(String text, bool isEndpoint, int sentenceIndex) {
-      var textToDisplay = _previousFullSentences.join('\n');
-      var newText = '$sentenceIndex: $text';
+    var textToDisplay = _previousFullSentences.join('\n');
+    var newText = '$sentenceIndex: $text';
+    if (text.isNotEmpty) {
+      textToDisplay += '\n$newText';
+    }
+
+    if (isEndpoint) {
       if (text.isNotEmpty) {
-        textToDisplay += '\n$newText';
+        _previousFullSentences.add(newText);
       }
+    }
 
-      if (isEndpoint) {
-        if (text.isNotEmpty) {
-          _previousFullSentences.add(newText);
-        }
-      }
-
-      _controller.value = TextEditingValue(
-        text: textToDisplay,
-        selection: TextSelection.collapsed(offset: textToDisplay.length),
-      );
+    _controller.value = TextEditingValue(
+      text: textToDisplay,
+      selection: TextSelection.collapsed(offset: textToDisplay.length),
+    );
   }
 
   Future<void> _initializeApp() async {
@@ -173,13 +173,14 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       // For mobile platforms, listen to background service updates
       _service.on('transcription').listen((event) {
         if (event != null) {
-          updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
+          updateText(
+              event['text'], event['isEndpoint'], event['sentenceIndex']);
         }
       });
     } else {
-    final processor = await audioProcessor(updateText);
-    Recorder.instance.start();
-    Recorder.instance.uint8ListStream.listen(processor.processAudioData);
+      final processor = await audioProcessor(updateText);
+      Recorder.instance.start();
+      Recorder.instance.uint8ListStream.listen(processor.processAudioData);
     }
   }
 
@@ -303,6 +304,7 @@ class AudioProcessingService {
     recognizer.free();
   }
 }
+
 Future<AudioProcessingService> audioProcessor(
   final void Function(String text, bool isEndpoint, int processedIndex)
       onTranscriptionUpdate,
@@ -326,4 +328,16 @@ Future<AudioProcessingService> audioProcessor(
     stream: stream,
     onTranscriptionUpdate: onTranscriptionUpdate,
   );
+}
+
+Database createDB() {
+  final database = sqlite3.openInMemory();
+
+  database.execute('''create table messages (
+    id integer not null primary key,
+    text text not null,
+    timestamp text not null,
+  )''');
+
+  return database;
 }
