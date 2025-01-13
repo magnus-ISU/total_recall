@@ -327,50 +327,50 @@ packages:
     dependency: "direct main"
     description:
       name: sherpa_onnx
-      sha256: "9e3a6f500456736b294f56c163c2fe2744762c91382393e84a9e53d7acda62d0"
+      sha256: "00bf684c8cabcd5815f346f17c43313914a55509474ffad9cd00f5f9b7ad22e1"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: "9bb85ce93bf5c0da18b6a6dab9606a43046a7c7eb6040ef4e3307ab0d9961f53"
+      sha256: "4bbd77e0b87f45583e555b11862407c7a071d2d3cf780c465e860c30b964ab3e"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: "426895339d48c9918eca636c6aa819e1f015f3cdb8c120ef049de6441f513714"
+      sha256: "39d3866f70bb001f9ca350edac14803bcae028942b25b80f1b8ca73a6221f3a5"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: eca9c74562a156ba11eb64b4fe78b8ab98266bbeb690c943e9adfa4d380cf962
+      sha256: f638a4ff0195d36aab9b11ac2b85bb6f2ece149f13536d139622e32cca122e8a
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: "7ea7f0b39679a428c5639ee9f3890604c48c500ee02cc1db9d323df1a9f0801d"
+      sha256: "6d7cbe0fbe9dbaa445b6c45f60de00737bdcbe152fac3d3d2cff924c103246e1"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: f7e896da2ac647c99074c8f06ed6a4d8b8bff838b4031ee6c859a3bc384084e4
+      sha256: "4560efad9fe2ea2b2e92801c9d60f56ef8d52536c71c65e293aca09cd92dc78b"
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.38"
+    version: "1.10.39"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -384,6 +384,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.1"
+  sqlite3:
+    dependency: "direct main"
+    description:
+      name: sqlite3
+      sha256: c284434c408d207863800341298cadfde23abe074a0f01b19c9d8cce4edb8eaa
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.6.0"
+  sqlite3_flutter_libs:
+    dependency: "direct main"
+    description:
+      name: sqlite3_flutter_libs
+      sha256: "73016db8419f019e807b7a5e5fbf2a7bd45c165fed403b8e7681230f3a102785"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.28"
   string_scanner:
     dependency: transitive
     description:

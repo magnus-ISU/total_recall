@@ -11,13 +11,18 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
+import 'package:sqlite3/sqlite3.dart';
 
 // Notification channel details
 const notificationChannelId = 'transcription_service';
 const notificationId = 888;
 
+late Database db;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  db = sqlite3.openInMemory();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await initializeBackgroundService();
