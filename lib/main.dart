@@ -68,6 +68,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     super.initState();
     _initializeApp();
     _previousFullSentences = getMessages().map((v) => '${v.$1}: ${v.$2}').toList().join('\n');
+    _controller.value = TextEditingValue(text: _previousFullSentences);
   }
 
   void updateText(String text, bool isEndpoint, int sentenceIndex) {
@@ -86,10 +87,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       }
     }
 
-    _controller.value = TextEditingValue(
-      text: textToDisplay,
-      selection: TextSelection.collapsed(offset: textToDisplay.length),
-    );
+    _controller.value = TextEditingValue(text: textToDisplay);
   }
 
   Future<void> _initializeApp() async {
@@ -261,16 +259,13 @@ Future<AudioProcessingService> beginTranscription(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void createDB() {
-  db = sqlite3.openInMemory();
+  db = sqlite3.open(databaseFilename);
 
-  db.execute('''create table messages (
+  db.execute('''create table if not exists messages (
     text text not null,
     timestamp text not null,
     id integer not null primary key
   )''');
-
-  insertMessage('2024-01-13', 'test 1 message');
-  insertMessage('2024-01-12', 'test 2 message');
 }
 
 final insertMessageSQL = db.prepare('insert into messages (timestamp, text) values (?, ?)');
@@ -281,6 +276,10 @@ insertMessage(String timestamp, String text) {
 List<(String, String)> getMessages() {
   final ResultSet results = db.select('SELECT timestamp, text FROM messages ORDER BY timestamp DESC');
   return results.map((row) => (row['timestamp'] as String, row['text'] as String)).toList();
+}
+
+String get databaseFilename {
+  return "total_recall.sqlite";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
