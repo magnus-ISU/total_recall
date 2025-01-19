@@ -22,6 +22,8 @@ late Database db;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  directory = await getApplicationDocumentsDirectory();
+  debugPrint(directory.path);
   createDB();
 
   if (Platform.isAndroid || Platform.isIOS) {
@@ -60,6 +62,7 @@ class TranscriptionScreen extends StatefulWidget {
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _previousFullSentences = '';
   late final FlutterBackgroundService _service;
 
@@ -67,27 +70,45 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   void initState() {
     super.initState();
     _initializeApp();
-    _previousFullSentences = getMessages().map((v) => '${v.$1}: ${v.$2}').toList().join('\n');
+    _previousFullSentences = getMessages().map((v) => '${v.$1.toNiceString()}: ${v.$2}').toList().join('\n');
     _controller.value = TextEditingValue(text: _previousFullSentences);
+    _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
+  }
+
+  void _animateScrollToBottom() {
+    if (_scrollController.hasClients) {
+      final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
+      if (isAtBottom) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
   }
 
   void updateText(String text, bool isEndpoint, int sentenceIndex) {
     var textToDisplay = _previousFullSentences;
-    var timestamp = DateTime.timestamp().toIso8601String();
-    var newText = '$timestamp: $text';
+    var timestamp = DateTime.now();
+    var newText = '${timestamp.toNiceString()}: $text';
     if (text.isNotEmpty) {
       textToDisplay += '\n$newText';
     }
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
-        insertMessage(timestamp, text);
+        insertMessage(timestamp.millisecondsSinceEpoch, text);
         if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
         _previousFullSentences += newText;
       }
     }
 
     _controller.value = TextEditingValue(text: textToDisplay);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animateScrollToBottom();
+    });
   }
 
   Future<void> _initializeApp() async {
@@ -110,16 +131,18 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       appBar: AppBar(
         title: const Text('Live Transcription'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: TextField(
-          maxLines: null,
-          controller: _controller,
-          readOnly: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Transcription will appear here...',
-          ),
+      body: TextField(
+        controller: _controller,
+        scrollController: _scrollController,
+        maxLines: null,
+        readOnly: true,
+        expands: true,
+        textAlignVertical: TextAlignVertical.bottom,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: 'Transcription will appear here...',
+          filled: true,
+          fillColor: Colors.white,
         ),
       ),
     );
@@ -128,6 +151,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }
@@ -164,8 +188,8 @@ Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
   return sherpa_onnx.OnlineRecognizer(config);
 }
 
+late final Directory directory;
 Future<String> copyAssetFile(String src) async {
-  final Directory directory = await getApplicationDocumentsDirectory();
   final dst = p.basename(src);
   final target = p.join(directory.path, dst);
   bool exists = await File(target).exists();
@@ -263,19 +287,19 @@ void createDB() {
 
   db.execute('''create table if not exists messages (
     text text not null,
-    timestamp text not null,
+    timestamp integer not null,
     id integer not null primary key
   )''');
 }
 
 final insertMessageSQL = db.prepare('insert into messages (timestamp, text) values (?, ?)');
-insertMessage(String timestamp, String text) {
-  insertMessageSQL.execute([timestamp, text]);
+void insertMessage(int timestampMillisecondsSinceEpoch, String text) {
+  insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
 }
 
-List<(String, String)> getMessages() {
+List<(DateTime, String)> getMessages() {
   final ResultSet results = db.select('SELECT timestamp, text FROM messages ORDER BY timestamp DESC');
-  return results.map((row) => (row['timestamp'] as String, row['text'] as String)).toList();
+  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
 }
 
 String get databaseFilename {
@@ -349,7 +373,7 @@ void onMobileStart(ServiceInstance service) async {
           'text': text,
           'isEndpoint': isEndpoint,
           'sentenceIndex': sentenceIndex,
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
     }
@@ -359,4 +383,14 @@ void onMobileStart(ServiceInstance service) async {
     processor.dispose();
     service.stopSelf();
   });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Misc
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extension on DateTime {
+  String toNiceString() {
+    return '$year-$month-$day $hour:$minute:$second';
+  }
 }
