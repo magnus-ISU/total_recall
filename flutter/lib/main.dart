@@ -105,7 +105,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
 
     _controller.value = TextEditingValue(text: textToDisplay);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animateScrollToBottom();
     });
