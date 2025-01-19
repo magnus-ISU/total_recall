@@ -2,11 +2,7 @@
 
 Remember everything that your device hears, as text (in sqlite for now)
 
-## Getting Started
-
-For development/running:
-
-```
+```sh
 make macos
 make android
 ```
