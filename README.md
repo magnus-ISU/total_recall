@@ -1,16 +1,19 @@
 # total_recall
 
-A new Flutter project.
+Remember everything that your device hears, as text (in sqlite for now)
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+First, install the sherpa_onnx models:
 
-A few resources to get you started if this is your first Flutter project:
+```
+cd assets
+./install_assets.sh
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+For development/running:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```
+flutter run -d macos
+flutter build apk --release
+```
