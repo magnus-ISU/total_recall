@@ -26,7 +26,7 @@ Future<void> main() async {
   debugPrint(directory.path);
   createDB();
 
-  if (Platform.isAndroid || Platform.isIOS) {
+  if (isMobile) {
     await initializeBackgroundService();
   }
 
@@ -111,7 +111,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   Future<void> _initializeApp() async {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (isMobile) {
       // For mobile platforms, listen to background service updates
       _service = FlutterBackgroundService();
       _service.on('transcription').listen((event) {
@@ -392,4 +392,8 @@ extension on DateTime {
   String toNiceString() {
     return '$year-$month-$day $hour:$minute:$second';
   }
+}
+
+bool get isMobile {
+  return Platform.isAndroid || Platform.isIOS;
 }
