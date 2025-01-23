@@ -65,7 +65,7 @@ class TranscriptionScreen extends StatefulWidget {
 }
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
-  final TextEditingController _textEditingController = TextEditingController();
+  final TextEditingController _newSentenceEditingController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final List<(DateTime, String)> messageHistory;
   final List<(DateTime, String)> newMessages = [];
@@ -100,8 +100,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   SliverList get _currentlyTranscribingSentence {
-    final textField = DisplayTextField(
-      controller: _textEditingController,
+    final textField = displayTextField(
+      controller: _newSentenceEditingController,
     );
     return SliverList.list(
       children: [textField],
@@ -123,7 +123,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       itemCount: messageHistory.length,
       itemBuilder: (BuildContext context, int index) {
         if (index == messageHistory.length - 1) {
-          loadMoreHistory();
+          _loadMoreHistory();
         }
 
         final (timestamp, messageText) = messageHistory[index];
@@ -133,15 +133,17 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   bool _isLoading = false;
-  Future<void> loadMoreHistory() async => Future.delayed(Duration.zero).then((_) async {
-        if (_isLoading) return;
-        setState(() => _isLoading = true);
-        setState(() {
-          final newMessages = dbGetMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
-          messageHistory.addAll(newMessages);
-          if (newMessages.isNotEmpty) _isLoading = false;
-        });
+  Future<void> _loadMoreHistory() async {
+    Future.delayed(Duration.zero).then((_) async {
+      if (_isLoading) return;
+      setState(() => _isLoading = true);
+      setState(() {
+        final newMessages = dbGetMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
+        messageHistory.addAll(newMessages);
+        if (newMessages.isNotEmpty) _isLoading = false;
       });
+    });
+  }
 
   void _continueScrollingToBottom() {
     if (_scrollController.hasClients) {
@@ -156,7 +158,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
   }
 
-  void updateText(String text, bool isEndpoint) {
+  void _updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
     var newText = '';
     if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: ${text.toLowerCase()}';
@@ -167,13 +169,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       newText = '';
     }
 
-    _textEditingController.value = TextEditingValue(text: newText);
+    _newSentenceEditingController.value = TextEditingValue(text: newText);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _continueScrollingToBottom();
     });
   }
 
-  TextField DisplayTextField({TextEditingController? controller}) => TextField(
+  TextField displayTextField({TextEditingController? controller}) => TextField(
         controller: controller,
         decoration: InputDecoration(
           border: InputBorder.none, // Remove underline
@@ -192,17 +194,17 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       _service = FlutterBackgroundService();
       _service.on('transcription').listen((event) {
         if (event != null) {
-          updateText(event['text'], event['isEndpoint']);
+          _updateText(event['text'], event['isEndpoint']);
         }
       });
     } else {
-      await beginTranscription(updateText);
+      await beginTranscription(_updateText);
     }
   }
 
   @override
   void dispose() {
-    _textEditingController?.dispose();
+    _newSentenceEditingController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
