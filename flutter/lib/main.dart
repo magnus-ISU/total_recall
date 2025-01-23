@@ -182,6 +182,9 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
 
     _textEditingController.value = TextEditingValue(text: newText);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _continueScrollingToBottom();
+    });
   }
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
