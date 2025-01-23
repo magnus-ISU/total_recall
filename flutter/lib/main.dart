@@ -80,17 +80,16 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final centerKey = Key('center');
+    final centerKey = Key('');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Live Transcription'),
+        title: const Text('Total Recall'),
       ),
       body: CustomScrollView(
         center: centerKey,
-        anchor: 1,
+        anchor: 0.8,
         controller: _scrollController,
         slivers: [
-          SliverFillRemaining(),
           _historyListView,
           SliverList.list(key: centerKey, children: []),
           _newMessagesListView,
@@ -101,7 +100,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   SliverList get _currentlyTranscribingSentence {
-    final textField = TextField(
+    final textField = DisplayTextField(
       controller: _textEditingController,
     );
     return SliverList.list(
@@ -163,7 +162,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   void updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
     var newText = '';
-    if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: $text';
+    if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: ${text.toLowerCase()}';
 
     if (isEndpoint && text.isNotEmpty) {
       dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
@@ -187,6 +186,17 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     });
   }
 
+  TextField DisplayTextField({TextEditingController? controller}) => TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          border: InputBorder.none, // Remove underline
+          contentPadding: EdgeInsets.zero, // Align with Text
+          isDense: true, // Compact layout
+        ),
+        style: TextStyle(fontSize: 13.5), // Match your Text widget's style
+        maxLines: null,
+      );
+
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
 
   Future<void> _initializeApp() async {
@@ -206,106 +216,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   @override
   void dispose() {
     _textEditingController?.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-}
-
-class __TranscriptionScreenState extends State<TranscriptionScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  String _previousFullSentences = '';
-  late final FlutterBackgroundService _service;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-    _previousFullSentences = dbGetMessages().map((v) => '${v.$1.toNiceString()}: ${v.$2}').toList().join('\n');
-    _controller.value = TextEditingValue(text: _previousFullSentences);
-    _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollController.jumpTo(
-        _scrollController.position.maxScrollExtent,
-      );
-    });
-  }
-
-  void _animateScrollToBottom() {
-    if (_scrollController.hasClients) {
-      final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
-      if (isAtBottom) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    }
-  }
-
-  void updateText(String text, bool isEndpoint) {
-    var textToDisplay = _previousFullSentences;
-    var timestamp = DateTime.now();
-    var newText = '${timestamp.toNiceString()}: $text';
-    if (text.isNotEmpty) {
-      textToDisplay += '\n$newText';
-    }
-
-    if (isEndpoint) {
-      if (text.isNotEmpty) {
-        dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
-        if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
-        _previousFullSentences += newText;
-      }
-    }
-
-    _controller.value = TextEditingValue(text: textToDisplay);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _animateScrollToBottom();
-    });
-  }
-
-  Future<void> _initializeApp() async {
-    if (isMobile) {
-      // For mobile platforms, listen to background service updates
-      _service = FlutterBackgroundService();
-      _service.on('transcription').listen((event) {
-        if (event != null) {
-          updateText(event['text'], event['isEndpoint']);
-        }
-      });
-    } else {
-      await beginTranscription(updateText);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live Transcription'),
-      ),
-      body: TextField(
-        controller: _controller,
-        scrollController: _scrollController,
-        maxLines: null,
-        readOnly: true,
-        expands: true,
-        textAlignVertical: TextAlignVertical.bottom,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Transcription will appear here...',
-          filled: true,
-          fillColor: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -449,7 +359,7 @@ void dbInsertMessage(int timestampMillisecondsSinceEpoch, String text) {
   insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
 }
 
-final getMessagesSQL = db.prepare('select timestamp, text from messages where timestamp <= ? order by timestamp desc limit 1000 offset ?');
+final getMessagesSQL = db.prepare('select timestamp, text from messages where timestamp <= ? order by timestamp desc limit 20000 offset ?');
 Iterable<(DateTime, String)> dbGetMessages({int beforeIndex = 0, DateTime? beforeTime}) {
   final beforeTimeMillis = (beforeTime ?? DateTime.now()).millisecondsSinceEpoch;
   final ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
@@ -542,8 +452,12 @@ void onMobileStart(ServiceInstance service) async {
 
 extension on DateTime {
   String toNiceString() {
-    return '$year-$month-$day $hour:$minute:$second';
+    return '$year-${month.padLeft2}-${day.padLeft2} ${hour.padLeft2}:${minute.padLeft2}:${second.padLeft2}';
   }
+}
+
+extension on int {
+  String get padLeft2 => toString().padLeft(2, '0');
 }
 
 bool get isMobile {
