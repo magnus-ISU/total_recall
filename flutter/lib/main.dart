@@ -123,7 +123,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       itemCount: messageHistory.length,
       itemBuilder: (BuildContext context, int index) {
         if (index == messageHistory.length - 1) {
-          // get new messages
           loadMoreHistory();
         }
 
@@ -134,17 +133,15 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   bool _isLoading = false;
-  Future<void> loadMoreHistory() async {
-    Future.delayed(Duration.zero).then((_) async {
-      if (_isLoading) return;
-      setState(() => _isLoading = true);
-      setState(() {
-        final newMessages = dbGetMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
-        messageHistory.addAll(newMessages);
-        if (newMessages.isNotEmpty) _isLoading = false;
+  Future<void> loadMoreHistory() async => Future.delayed(Duration.zero).then((_) async {
+        if (_isLoading) return;
+        setState(() => _isLoading = true);
+        setState(() {
+          final newMessages = dbGetMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
+          messageHistory.addAll(newMessages);
+          if (newMessages.isNotEmpty) _isLoading = false;
+        });
       });
-    });
-  }
 
   void _continueScrollingToBottom() {
     if (_scrollController.hasClients) {
@@ -166,17 +163,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
     if (isEndpoint && text.isNotEmpty) {
       dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
-      final scroll = _scrollController.offset;
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final scrollPos = _scrollController.position;
-      Future.delayed(Duration(seconds: 1)).then(
-        (_) => debugPrint(
-          'Scroll original: $scroll $maxScroll $scrollPos new: ${_scrollController.offset} ${_scrollController.position.maxScrollExtent} ${_scrollController.position}}',
-        ),
-      );
-      setState(() {
-        newMessages.add((timestamp, text));
-      });
+      setState(() => newMessages.add((timestamp, text)));
       newText = '';
     }
 
