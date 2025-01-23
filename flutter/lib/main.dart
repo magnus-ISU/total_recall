@@ -30,6 +30,10 @@ Future<void> main() async {
     await initializeBackgroundService();
   }
 
+  if (Platform.isAndroid || Platform.isIOS) {
+    await Permission.microphone.request();
+  }
+
   runApp(const TotalRecallUI());
 }
 
@@ -73,6 +77,11 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     _previousFullSentences = getMessages().map((v) => '${v.$1.toNiceString()}: ${v.$2}').toList().join('\n');
     _controller.value = TextEditingValue(text: _previousFullSentences);
     _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.jumpTo(
+        _scrollController.position.maxScrollExtent,
+      );
+    });
   }
 
   void _animateScrollToBottom() {
@@ -297,7 +306,7 @@ void insertMessage(int timestampMillisecondsSinceEpoch, String text) {
 }
 
 List<(DateTime, String)> getMessages() {
-  final ResultSet results = db.select('SELECT timestamp, text FROM messages ORDER BY timestamp DESC');
+  final ResultSet results = db.select('select timestamp, text from messages order by timestamp');
   return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
 }
 
@@ -395,5 +404,6 @@ extension on DateTime {
 }
 
 bool get isMobile {
-  return Platform.isAndroid || Platform.isIOS;
+  return false;
+//   return Platform.isAndroid || Platform.isIOS;
 }
