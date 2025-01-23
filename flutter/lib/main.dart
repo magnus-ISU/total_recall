@@ -80,17 +80,21 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final centerKey = Key('center');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Live Transcription'),
       ),
       body: CustomScrollView(
-        reverse: true,
+        center: centerKey,
+        anchor: 1,
+        controller: _scrollController,
         slivers: [
-          _currentlyTranscribingSentence,
-          _newMessagesListView,
-          _historyListView,
           SliverFillRemaining(),
+          _historyListView,
+          SliverList.list(key: centerKey, children: []),
+          _newMessagesListView,
+          _currentlyTranscribingSentence,
         ],
       ),
     );
@@ -109,7 +113,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     return SliverList.builder(
       itemCount: newMessages.length,
       itemBuilder: (BuildContext context, int index) {
-        final (timestamp, messageText) = newMessages[newMessages.length - 1 - index];
+        final (timestamp, messageText) = newMessages[index];
         return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
       },
     );
@@ -158,10 +162,19 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   void updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
-    var newText = '${timestamp.toNiceString()}: $text';
+    var newText = '';
+    if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: $text';
 
     if (isEndpoint && text.isNotEmpty) {
       dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
+      final scroll = _scrollController.offset;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final scrollPos = _scrollController.position;
+      Future.delayed(Duration(seconds: 1)).then(
+        (_) => debugPrint(
+          'Scroll original: $scroll $maxScroll $scrollPos new: ${_scrollController.offset} ${_scrollController.position.maxScrollExtent} ${_scrollController.position}}',
+        ),
+      );
       setState(() {
         newMessages.add((timestamp, text));
       });
@@ -169,9 +182,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
 
     _textEditingController.value = TextEditingValue(text: newText);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _continueScrollingToBottom();
-    });
   }
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
