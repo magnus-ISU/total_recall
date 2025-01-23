@@ -109,7 +109,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     return SliverList.builder(
       itemCount: newMessages.length,
       itemBuilder: (BuildContext context, int index) {
-        final (timestamp, messageText) = newMessages[index];
+        final (timestamp, messageText) = newMessages[newMessages.length - 1 - index];
         return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
       },
     );
@@ -160,12 +160,12 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     var timestamp = DateTime.now();
     var newText = '${timestamp.toNiceString()}: $text';
 
-    if (isEndpoint) {
-      if (text.isNotEmpty) {
-        dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
-        if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
-        _previousFullSentences += newText;
-      }
+    if (isEndpoint && text.isNotEmpty) {
+      dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
+      setState(() {
+        newMessages.add((timestamp, text));
+      });
+      newText = '';
     }
 
     _textEditingController.value = TextEditingValue(text: newText);
