@@ -305,9 +305,10 @@ void insertMessage(int timestampMillisecondsSinceEpoch, String text) {
   insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
 }
 
-List<(DateTime, String)> getMessages() {
-  final ResultSet results = db.select('select timestamp, text from messages order by timestamp');
-  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
+final getMessagesSQL = db.prepare('select timestamp, text from messages order by timestamp desc limit 1000 offset ?');
+Iterable<(DateTime, String)> getMessages({int beforeIndex = 0}) {
+  final ResultSet results = getMessagesSQL.select([beforeIndex]);
+  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList().reversed;
 }
 
 String get databaseFilename {
