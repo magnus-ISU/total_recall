@@ -24,7 +24,7 @@ Future<void> main() async {
 
   directory = await getApplicationDocumentsDirectory();
   debugPrint(directory.path);
-  createDB();
+  dbCreate();
 
   if (isMobile) {
     await initializeBackgroundService();
@@ -65,7 +65,7 @@ class TranscriptionScreen extends StatefulWidget {
 }
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
-  TextEditingController? _textEditingController;
+  final TextEditingController _textEditingController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final List<(DateTime, String)> messageHistory;
   final List<(DateTime, String)> newMessages = [];
@@ -75,7 +75,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   void initState() {
     super.initState();
     _initializeApp();
-    messageHistory = getMessages().toList();
+    messageHistory = dbGetMessages().toList();
   }
 
   @override
@@ -87,34 +87,38 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       body: CustomScrollView(
         reverse: true,
         slivers: [
-          SliverList.list(
-            children: [Text("This is new messages")],
-          ),
+          _currentlyTranscribingSentence,
+          _newMessagesListView,
           _historyListView,
+          SliverFillRemaining(),
         ],
       ),
     );
   }
 
-  bool _isLoading = false;
-  Future<void> loadMoreHistory() async {
-    Future.delayed(Duration.zero).then((_) async {
-      if (_isLoading) return;
-      setState(() => _isLoading = true);
-      setState(() {
-        final newMessages = getMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
-        messageHistory.addAll(newMessages);
-        if (newMessages.isNotEmpty) _isLoading = false;
-      });
-    });
+  SliverList get _currentlyTranscribingSentence {
+    final textField = TextField(
+      controller: _textEditingController,
+    );
+    return SliverList.list(
+      children: [textField],
+    );
   }
 
-  int counter = 0;
+  SliverList get _newMessagesListView {
+    return SliverList.builder(
+      itemCount: newMessages.length,
+      itemBuilder: (BuildContext context, int index) {
+        final (timestamp, messageText) = newMessages[index];
+        return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
+      },
+    );
+  }
+
   SliverList get _historyListView {
     return SliverList.builder(
       itemCount: messageHistory.length,
       itemBuilder: (BuildContext context, int index) {
-        debugPrint('Building history index $index ${counter++}');
         if (index == messageHistory.length - 1) {
           // get new messages
           loadMoreHistory();
@@ -126,11 +130,20 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     );
   }
 
-  Widget get _newMessagesListView {
-    return ListView();
+  bool _isLoading = false;
+  Future<void> loadMoreHistory() async {
+    Future.delayed(Duration.zero).then((_) async {
+      if (_isLoading) return;
+      setState(() => _isLoading = true);
+      setState(() {
+        final newMessages = dbGetMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
+        messageHistory.addAll(newMessages);
+        if (newMessages.isNotEmpty) _isLoading = false;
+      });
+    });
   }
 
-  void _animateScrollToBottom() {
+  void _continueScrollingToBottom() {
     if (_scrollController.hasClients) {
       final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
       if (isAtBottom) {
@@ -143,30 +156,23 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
   }
 
-/*
-  void updateText(String text, bool isEndpoint, int sentenceIndex) {
-    var textToDisplay = _previousFullSentences;
+  void updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
     var newText = '${timestamp.toNiceString()}: $text';
-    if (text.isNotEmpty) {
-      textToDisplay += '\n$newText';
-    }
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
-        insertMessage(timestamp.millisecondsSinceEpoch, text);
+        dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
         if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
         _previousFullSentences += newText;
       }
     }
 
-    _controller.value = TextEditingValue(text: textToDisplay);
+    _textEditingController.value = TextEditingValue(text: newText);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _animateScrollToBottom();
+      _continueScrollingToBottom();
     });
   }
-
-*/
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
 
@@ -176,11 +182,11 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       _service = FlutterBackgroundService();
       _service.on('transcription').listen((event) {
         if (event != null) {
-          //   updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
+          updateText(event['text'], event['isEndpoint']);
         }
       });
     } else {
-      //   await beginTranscription(updateText);
+      await beginTranscription(updateText);
     }
   }
 
@@ -202,7 +208,7 @@ class __TranscriptionScreenState extends State<TranscriptionScreen> {
   void initState() {
     super.initState();
     _initializeApp();
-    _previousFullSentences = getMessages().map((v) => '${v.$1.toNiceString()}: ${v.$2}').toList().join('\n');
+    _previousFullSentences = dbGetMessages().map((v) => '${v.$1.toNiceString()}: ${v.$2}').toList().join('\n');
     _controller.value = TextEditingValue(text: _previousFullSentences);
     _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -225,7 +231,7 @@ class __TranscriptionScreenState extends State<TranscriptionScreen> {
     }
   }
 
-  void updateText(String text, bool isEndpoint, int sentenceIndex) {
+  void updateText(String text, bool isEndpoint) {
     var textToDisplay = _previousFullSentences;
     var timestamp = DateTime.now();
     var newText = '${timestamp.toNiceString()}: $text';
@@ -235,7 +241,7 @@ class __TranscriptionScreenState extends State<TranscriptionScreen> {
 
     if (isEndpoint) {
       if (text.isNotEmpty) {
-        insertMessage(timestamp.millisecondsSinceEpoch, text);
+        dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
         if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
         _previousFullSentences += newText;
       }
@@ -253,7 +259,7 @@ class __TranscriptionScreenState extends State<TranscriptionScreen> {
       _service = FlutterBackgroundService();
       _service.on('transcription').listen((event) {
         if (event != null) {
-          updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
+          updateText(event['text'], event['isEndpoint']);
         }
       });
     } else {
@@ -348,9 +354,7 @@ Float32List bytesAsFloat32(Uint8List bytes) {
 class AudioProcessingService {
   final sherpa_onnx.OnlineRecognizer recognizer;
   final sherpa_onnx.OnlineStream stream;
-  final void Function(String text, bool isEndpoint, int processedIndex) onTranscriptionUpdate;
-
-  int processedIndex = 0;
+  final void Function(String text, bool isEndpoint) onTranscriptionUpdate;
 
   AudioProcessingService({
     required this.recognizer,
@@ -371,12 +375,11 @@ class AudioProcessingService {
     bool isEndpoint = recognizer.isEndpoint(stream);
 
     if (text.isNotEmpty || isEndpoint) {
-      onTranscriptionUpdate(text, isEndpoint, processedIndex);
+      onTranscriptionUpdate(text, isEndpoint);
     }
 
     if (isEndpoint) {
       recognizer.reset(stream);
-      processedIndex++;
     }
   }
 
@@ -387,7 +390,7 @@ class AudioProcessingService {
 }
 
 Future<AudioProcessingService> beginTranscription(
-  final void Function(String text, bool isEndpoint, int processedIndex) onTranscriptionUpdate,
+  final void Function(String text, bool isEndpoint) onTranscriptionUpdate,
 ) async {
   // Initialize recorder
   await Recorder.instance.init(
@@ -418,7 +421,7 @@ Future<AudioProcessingService> beginTranscription(
 // DATABASE
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void createDB() {
+void dbCreate() {
   db = sqlite3.open(databaseFilename);
 
   db.execute('''create table if not exists messages (
@@ -429,12 +432,12 @@ void createDB() {
 }
 
 final insertMessageSQL = db.prepare('insert into messages (timestamp, text) values (?, ?)');
-void insertMessage(int timestampMillisecondsSinceEpoch, String text) {
+void dbInsertMessage(int timestampMillisecondsSinceEpoch, String text) {
   insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
 }
 
 final getMessagesSQL = db.prepare('select timestamp, text from messages where timestamp <= ? order by timestamp desc limit 1000 offset ?');
-Iterable<(DateTime, String)> getMessages({int beforeIndex = 0, DateTime? beforeTime}) {
+Iterable<(DateTime, String)> dbGetMessages({int beforeIndex = 0, DateTime? beforeTime}) {
   final beforeTimeMillis = (beforeTime ?? DateTime.now()).millisecondsSinceEpoch;
   final ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
   return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
@@ -497,7 +500,7 @@ void onMobileStart(ServiceInstance service) async {
 
   await Permission.microphone.request();
 
-  final processor = await beginTranscription((text, isEndpoint, sentenceIndex) {
+  final processor = await beginTranscription((text, isEndpoint) {
     if (service is AndroidServiceInstance) {
       service.setForegroundNotificationInfo(
         title: 'Transcription Active',
@@ -508,7 +511,6 @@ void onMobileStart(ServiceInstance service) async {
         {
           'text': text,
           'isEndpoint': isEndpoint,
-          'sentenceIndex': sentenceIndex,
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
