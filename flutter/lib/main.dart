@@ -65,6 +65,134 @@ class TranscriptionScreen extends StatefulWidget {
 }
 
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
+  TextEditingController? _textEditingController;
+  final ScrollController _scrollController = ScrollController();
+  late final List<(DateTime, String)> messageHistory;
+  final List<(DateTime, String)> newMessages = [];
+  late final FlutterBackgroundService _service;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+    messageHistory = getMessages().toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Live Transcription'),
+      ),
+      body: CustomScrollView(
+        reverse: true,
+        slivers: [
+          SliverList.list(
+            children: [Text("This is new messages")],
+          ),
+          _historyListView,
+        ],
+      ),
+    );
+  }
+
+  bool _isLoading = false;
+  Future<void> loadMoreHistory() async {
+    Future.delayed(Duration.zero).then((_) async {
+      if (_isLoading) return;
+      setState(() => _isLoading = true);
+      setState(() {
+        final newMessages = getMessages(beforeIndex: messageHistory.length, beforeTime: _beforeHistoryTime);
+        messageHistory.addAll(newMessages);
+        if (newMessages.isNotEmpty) _isLoading = false;
+      });
+    });
+  }
+
+  int counter = 0;
+  SliverList get _historyListView {
+    return SliverList.builder(
+      itemCount: messageHistory.length,
+      itemBuilder: (BuildContext context, int index) {
+        debugPrint('Building history index $index ${counter++}');
+        if (index == messageHistory.length - 1) {
+          // get new messages
+          loadMoreHistory();
+        }
+
+        final (timestamp, messageText) = messageHistory[index];
+        return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
+      },
+    );
+  }
+
+  Widget get _newMessagesListView {
+    return ListView();
+  }
+
+  void _animateScrollToBottom() {
+    if (_scrollController.hasClients) {
+      final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
+      if (isAtBottom) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+  }
+
+/*
+  void updateText(String text, bool isEndpoint, int sentenceIndex) {
+    var textToDisplay = _previousFullSentences;
+    var timestamp = DateTime.now();
+    var newText = '${timestamp.toNiceString()}: $text';
+    if (text.isNotEmpty) {
+      textToDisplay += '\n$newText';
+    }
+
+    if (isEndpoint) {
+      if (text.isNotEmpty) {
+        insertMessage(timestamp.millisecondsSinceEpoch, text);
+        if (_previousFullSentences.isNotEmpty) _previousFullSentences += '\n';
+        _previousFullSentences += newText;
+      }
+    }
+
+    _controller.value = TextEditingValue(text: textToDisplay);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animateScrollToBottom();
+    });
+  }
+
+*/
+
+  DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
+
+  Future<void> _initializeApp() async {
+    if (isMobile) {
+      // For mobile platforms, listen to background service updates
+      _service = FlutterBackgroundService();
+      _service.on('transcription').listen((event) {
+        if (event != null) {
+          //   updateText(event['text'], event['isEndpoint'], event['sentenceIndex']);
+        }
+      });
+    } else {
+      //   await beginTranscription(updateText);
+    }
+  }
+
+  @override
+  void dispose() {
+    _textEditingController?.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
+
+class __TranscriptionScreenState extends State<TranscriptionScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _previousFullSentences = '';
@@ -305,15 +433,14 @@ void insertMessage(int timestampMillisecondsSinceEpoch, String text) {
   insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
 }
 
-final getMessagesSQL = db.prepare('select timestamp, text from messages order by timestamp desc limit 1000 offset ?');
-Iterable<(DateTime, String)> getMessages({int beforeIndex = 0}) {
-  final ResultSet results = getMessagesSQL.select([beforeIndex]);
-  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList().reversed;
+final getMessagesSQL = db.prepare('select timestamp, text from messages where timestamp <= ? order by timestamp desc limit 1000 offset ?');
+Iterable<(DateTime, String)> getMessages({int beforeIndex = 0, DateTime? beforeTime}) {
+  final beforeTimeMillis = (beforeTime ?? DateTime.now()).millisecondsSinceEpoch;
+  final ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
+  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
 }
 
-String get databaseFilename {
-  return "total_recall.sqlite";
-}
+String get databaseFilename => "total_recall.sqlite";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mobile background services
