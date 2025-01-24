@@ -22,7 +22,7 @@ late sqlite3.Database db;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  directory = await getApplicationDocumentsDirectory();
+  applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
   if (Platform.isAndroid || Platform.isIOS) {
@@ -273,10 +273,10 @@ Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
   return sherpa_onnx.OnlineRecognizer(config);
 }
 
-late final Directory directory;
+late final Directory applicationDocumentsDirectory;
 Future<String> copyAssetFile(String src) async {
   final dst = p.basename(src);
-  final target = p.join(directory.path, dst);
+  final target = p.join(applicationDocumentsDirectory.path, dst);
   bool exists = await File(target).exists();
 
   final data = await rootBundle.load(src);
@@ -364,6 +364,7 @@ Future<AudioProcessingService> beginTranscription(
 // DATABASE
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const databaseFilename = "total_recall.sqlite";
 void dbCreate() {
   db = sqlite3.sqlite3.open(databaseFilename);
   db.execute('''create table if not exists messages (
@@ -395,8 +396,6 @@ final deleteMessageSQL = db.prepare('delete from messages where id = ?');
 void dbDeleteMessage(int messageId) {
   deleteMessageSQL.execute([messageId]);
 }
-
-String get databaseFilename => "total_recall.sqlite";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mobile background services
