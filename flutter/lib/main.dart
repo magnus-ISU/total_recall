@@ -470,16 +470,11 @@ void onMobileStart(ServiceInstance service) async {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extension on DateTime {
-  String toNiceString() {
-    return '$year-${month.padLeft2}-${day.padLeft2} ${hour.padLeft2}:${minute.padLeft2}:${second.padLeft2}';
-  }
+  String toNiceString() => '$year-${month.padLeft2}-${day.padLeft2} ${hour.padLeft2}:${minute.padLeft2}:${second.padLeft2}';
 }
 
 extension on int {
   String get padLeft2 => toString().padLeft(2, '0');
 }
 
-bool get isMobile {
-  return false;
-//   return Platform.isAndroid || Platform.isIOS;
-}
+bool get isMobile => false; // Platform.isAndroid || Platform.isIOS;
