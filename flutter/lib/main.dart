@@ -193,19 +193,20 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     void Function(String)? onChanged,
     EdgeInsetsGeometry padding = EdgeInsets.zero,
     bool canRequestFocus = true,
-  }) =>
-      TextField(
-        controller: controller,
-        onChanged: onChanged,
-        maxLines: null,
-        canRequestFocus: canRequestFocus,
-        style: TextStyle(fontSize: 13.5), // Match your Text widget's style
-        decoration: InputDecoration(
-          border: InputBorder.none, // Remove underline
-          contentPadding: padding,
-          isDense: true, // Compact layout
-        ),
-      );
+  }) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      maxLines: null,
+      canRequestFocus: canRequestFocus,
+      style: TextStyle(fontSize: 13.5), // Match your Text widget's style
+      decoration: InputDecoration(
+        border: InputBorder.none, // Remove underline
+        contentPadding: padding,
+        isDense: true, // Compact layout
+      ),
+    );
+  }
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
 
