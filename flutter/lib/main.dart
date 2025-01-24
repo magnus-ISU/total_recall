@@ -13,21 +13,14 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
-// Notification channel details
-const notificationChannelId = 'transcription_service';
-const notificationId = 888;
-
-late sqlite3.Database db;
-
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
   applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();
   }
+  WidgetsFlutterBinding.ensureInitialized();
   if (isMobile) {
     await initializeBackgroundService();
   }
@@ -41,7 +34,6 @@ Future<void> main() async {
 
 class TotalRecallUI extends StatelessWidget {
   const TotalRecallUI({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -57,7 +49,6 @@ class TotalRecallUI extends StatelessWidget {
 
 class TranscriptionScreen extends StatefulWidget {
   const TranscriptionScreen({super.key});
-
   @override
   State<TranscriptionScreen> createState() => _TranscriptionScreenState();
 }
@@ -364,6 +355,7 @@ Future<AudioProcessingService> beginTranscription(
 // DATABASE
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+late sqlite3.Database db;
 const databaseFilename = "total_recall.sqlite";
 void dbCreate() {
   db = sqlite3.sqlite3.open(databaseFilename);
@@ -401,6 +393,8 @@ void dbDeleteMessage(int messageId) {
 // Mobile background services
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const notificationChannelId = 'transcription_service';
+const notificationId = 888;
 Future<void> initializeBackgroundService() async {
   final service = FlutterBackgroundService();
 
