@@ -11,13 +11,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 // Notification channel details
 const notificationChannelId = 'transcription_service';
 const notificationId = 888;
 
-late Database db;
+late sqlite3.Database db;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -102,6 +102,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   SliverList get _currentlyTranscribingSentence {
     final textField = displayTextField(
       controller: _newSentenceEditingController,
+      canRequestFocus: false,
+      padding: EdgeInsets.only(left: 10.0, right: 10.0),
     );
     return SliverList.list(
       children: [textField],
@@ -138,21 +140,22 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     var paddingBottom = 0.0;
     if (timestamp.millisecondsSinceEpoch + 60 * 1000 < nextTime.millisecondsSinceEpoch) paddingBottom = 25.0;
     final text = displayTextField(
-      controller: TextEditingController(text: recordString(timestamp, messageText)),
-      padding: EdgeInsets.only(bottom: paddingBottom),
+      controller: TextEditingController(text: messageText.trim().toLowerCase()),
+      padding: EdgeInsets.only(bottom: paddingBottom, left: 10.0, right: 10.0),
       onChanged: (v) {
-        final realTextIndex = v.indexOf(': ');
-        if (realTextIndex == -1) {
+        if (v.isEmpty) {
           dbDeleteMessage(id);
           setState(() => list.removeAt(index));
         } else {
-          final newText = v.substring(realTextIndex + 2);
-          dbEditMessage(id, newText);
-          list[index] = (timestamp, newText, id);
+          dbEditMessage(id, v);
+          list[index] = (timestamp, v, id);
         }
       },
     );
-    return text;
+    return Tooltip(
+      message: timestamp.toNiceString(),
+      child: text,
+    );
   }
 
   bool _isLoading = false;
@@ -171,7 +174,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   void _updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
     var newText = '';
-    if (text.isNotEmpty) newText = recordString(timestamp, text);
+    if (text.isNotEmpty) newText = text.trim().toLowerCase();
 
     if (isEndpoint && text.isNotEmpty) {
       final id = dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
@@ -197,21 +200,26 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
   }
 
-  TextField displayTextField({TextEditingController? controller, void Function(String)? onChanged, EdgeInsetsGeometry padding = EdgeInsets.zero}) =>
+  TextField displayTextField({
+    TextEditingController? controller,
+    void Function(String)? onChanged,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    bool canRequestFocus = true,
+  }) =>
       TextField(
         controller: controller,
         onChanged: onChanged,
+        maxLines: null,
+        canRequestFocus: canRequestFocus,
+        style: TextStyle(fontSize: 13.5), // Match your Text widget's style
         decoration: InputDecoration(
           border: InputBorder.none, // Remove underline
           contentPadding: padding,
           isDense: true, // Compact layout
         ),
-        style: TextStyle(fontSize: 13.5), // Match your Text widget's style
-        maxLines: null,
       );
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
-  String recordString(DateTime timestamp, String text) => '${timestamp.toNiceString()}: ${text.trim().toLowerCase()}';
 
   Future<void> _initializeApp() async {
     if (isMobile) {
@@ -359,7 +367,7 @@ Future<AudioProcessingService> beginTranscription(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void dbCreate() {
-  db = sqlite3.open(databaseFilename);
+  db = sqlite3.sqlite3.open(databaseFilename);
 
   db.execute('''create table if not exists messages (
     text text not null,
@@ -377,7 +385,7 @@ int dbInsertMessage(int timestampMillisecondsSinceEpoch, String text) {
 final getMessagesSQL = db.prepare('select timestamp, text, id from messages where timestamp <= ? order by timestamp desc limit 20000 offset ?');
 Iterable<(DateTime, String, int)> dbGetMessages({int beforeIndex = 0, DateTime? beforeTime}) {
   final beforeTimeMillis = (beforeTime ?? DateTime.now()).millisecondsSinceEpoch;
-  final ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
+  final sqlite3.ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
   return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String, row['id'] as int)).toList();
 }
 
