@@ -127,7 +127,15 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
   Widget lineOfTranscript(List<(DateTime, String)> list, int index) {
     final (timestamp, messageText) = list[index];
-    return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
+    var paddingTop = 0.0;
+    if (list.length > index + 1) {
+      paddingTop = 20.0;
+    }
+    final text = displayTextField(
+      controller: TextEditingController(text: '${timestamp.toNiceString()}: ${messageText.toLowerCase()}'),
+      padding: EdgeInsets.only(top: paddingTop),
+    );
+    return text;
   }
 
   bool _isLoading = false;
@@ -172,11 +180,13 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     });
   }
 
-  TextField displayTextField({TextEditingController? controller}) => TextField(
+  TextField displayTextField({TextEditingController? controller, void Function(String)? onChanged, EdgeInsetsGeometry padding = EdgeInsets.zero}) =>
+      TextField(
         controller: controller,
+        onChanged: onChanged,
         decoration: InputDecoration(
           border: InputBorder.none, // Remove underline
-          contentPadding: EdgeInsets.zero, // Align with Text
+          contentPadding: padding,
           isDense: true, // Compact layout
         ),
         style: TextStyle(fontSize: 13.5), // Match your Text widget's style
