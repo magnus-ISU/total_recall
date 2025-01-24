@@ -14,7 +14,6 @@ import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 Future<void> main() async {
-  applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
   if (Platform.isAndroid || Platform.isIOS) {
@@ -238,19 +237,20 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
   const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
+  applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   return sherpa_onnx.OnlineModelConfig(
     transducer: sherpa_onnx.OnlineTransducerModelConfig(
-      encoder: await copyAssetFile(
+      encoder: await copyAssetFileOnFirstRun(
         '$modelDir/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx',
       ),
-      decoder: await copyAssetFile(
+      decoder: await copyAssetFileOnFirstRun(
         '$modelDir/decoder-epoch-99-avg-1-chunk-16-left-128.onnx',
       ),
-      joiner: await copyAssetFile(
+      joiner: await copyAssetFileOnFirstRun(
         '$modelDir/joiner-epoch-99-avg-1-chunk-16-left-128.onnx',
       ),
     ),
-    tokens: await copyAssetFile('$modelDir/tokens.txt'),
+    tokens: await copyAssetFileOnFirstRun('$modelDir/tokens.txt'),
     modelType: 'zipformer2',
   );
 }
@@ -265,13 +265,12 @@ Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
 }
 
 late final Directory applicationDocumentsDirectory;
-Future<String> copyAssetFile(String src) async {
+Future<String> copyAssetFileOnFirstRun(String src) async {
   final dst = p.basename(src);
   final target = p.join(applicationDocumentsDirectory.path, dst);
   bool exists = await File(target).exists();
 
   final data = await rootBundle.load(src);
-
   if (!exists || File(target).lengthSync() != data.lengthInBytes) {
     final List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(target).writeAsBytes(bytes);
@@ -280,10 +279,7 @@ Future<String> copyAssetFile(String src) async {
   return target;
 }
 
-Float32List bytesAsFloat32(Uint8List bytes) {
-  final values = Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
-  return values;
-}
+Float32List bytesAsFloat32(Uint8List bytes) => Float32List.view(bytes.buffer, bytes.offsetInBytes, bytes.length ~/ 4);
 
 class AudioProcessingService {
   final sherpa_onnx.OnlineRecognizer recognizer;
