@@ -111,10 +111,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   SliverList get _newMessagesListView {
     return SliverList.builder(
       itemCount: newMessages.length,
-      itemBuilder: (BuildContext context, int index) {
-        final (timestamp, messageText) = newMessages[index];
-        return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
-      },
+      itemBuilder: (BuildContext context, int index) => lineOfTranscript(newMessages, index),
     );
   }
 
@@ -122,14 +119,15 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     return SliverList.builder(
       itemCount: messageHistory.length,
       itemBuilder: (BuildContext context, int index) {
-        if (index == messageHistory.length - 1) {
-          _loadMoreHistory();
-        }
-
-        final (timestamp, messageText) = messageHistory[index];
-        return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
+        if (index == messageHistory.length - 1) _loadMoreHistory();
+        return lineOfTranscript(messageHistory, index);
       },
     );
+  }
+
+  Widget lineOfTranscript(List<(DateTime, String)> list, int index) {
+    final (timestamp, messageText) = list[index];
+    return Text('${timestamp.toNiceString()}: ${messageText.toLowerCase()}');
   }
 
   bool _isLoading = false;
@@ -146,15 +144,14 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   }
 
   void _continueScrollingToBottom() {
-    if (_scrollController.hasClients) {
-      final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
-      if (isAtBottom) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
+    if (!_scrollController.hasClients) return;
+    final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
+    if (isAtBottom) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
     }
   }
 
