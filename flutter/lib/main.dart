@@ -138,7 +138,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     var paddingBottom = 0.0;
     if (timestamp.millisecondsSinceEpoch + 60 * 1000 < nextTime.millisecondsSinceEpoch) paddingBottom = 25.0;
     final text = displayTextField(
-      controller: TextEditingController(text: '${timestamp.toNiceString()}: ${messageText.trim().toLowerCase()}'),
+      controller: TextEditingController(text: recordString(timestamp, messageText)),
       padding: EdgeInsets.only(bottom: paddingBottom),
       onChanged: (v) {
         final realTextIndex = v.indexOf(': ');
@@ -146,7 +146,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
           dbDeleteMessage(id);
           setState(() => list.removeAt(index));
         } else {
-          final newText = v.substring(realTextIndex + 2).trim();
+          final newText = v.substring(realTextIndex + 2);
           dbEditMessage(id, newText);
           list[index] = (timestamp, newText, id);
         }
@@ -168,22 +168,10 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     });
   }
 
-  void _continueScrollingToBottom() {
-    if (!_scrollController.hasClients) return;
-    final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
-    if (isAtBottom) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
   void _updateText(String text, bool isEndpoint) {
     var timestamp = DateTime.now();
     var newText = '';
-    if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: ${text.toLowerCase()}';
+    if (text.isNotEmpty) newText = recordString(timestamp, text);
 
     if (isEndpoint && text.isNotEmpty) {
       final id = dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
@@ -195,6 +183,18 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _continueScrollingToBottom();
     });
+  }
+
+  void _continueScrollingToBottom() {
+    if (!_scrollController.hasClients) return;
+    final isAtBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent - 50;
+    if (isAtBottom) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   TextField displayTextField({TextEditingController? controller, void Function(String)? onChanged, EdgeInsetsGeometry padding = EdgeInsets.zero}) =>
@@ -211,6 +211,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       );
 
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
+  String recordString(DateTime timestamp, String text) => '${timestamp.toNiceString()}: ${text.trim().toLowerCase()}';
 
   Future<void> _initializeApp() async {
     if (isMobile) {
