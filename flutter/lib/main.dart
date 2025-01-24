@@ -25,12 +25,11 @@ Future<void> main() async {
   directory = await getApplicationDocumentsDirectory();
   dbCreate();
 
-  if (isMobile) {
-    await initializeBackgroundService();
-  }
-
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();
+  }
+  if (isMobile) {
+    await initializeBackgroundService();
   }
 
   runApp(const TotalRecallUI());
@@ -367,7 +366,6 @@ Future<AudioProcessingService> beginTranscription(
 
 void dbCreate() {
   db = sqlite3.sqlite3.open(databaseFilename);
-
   db.execute('''create table if not exists messages (
     text text not null,
     timestamp integer not null,
