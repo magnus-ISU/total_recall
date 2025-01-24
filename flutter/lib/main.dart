@@ -67,8 +67,8 @@ class TranscriptionScreen extends StatefulWidget {
 class _TranscriptionScreenState extends State<TranscriptionScreen> {
   final TextEditingController _newSentenceEditingController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  late final List<(DateTime, String)> messageHistory;
-  final List<(DateTime, String)> newMessages = [];
+  late final List<(DateTime, String, int)> messageHistory;
+  final List<(DateTime, String, int)> newMessages = [];
   late final FlutterBackgroundService _service;
 
   @override
@@ -87,7 +87,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       ),
       body: CustomScrollView(
         center: centerKey,
-        anchor: 0.8,
+        anchor: 0.2,
         controller: _scrollController,
         slivers: [
           _historyListView,
@@ -111,7 +111,11 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   SliverList get _newMessagesListView {
     return SliverList.builder(
       itemCount: newMessages.length,
-      itemBuilder: (BuildContext context, int index) => lineOfTranscript(newMessages, index),
+      itemBuilder: (BuildContext context, int index) => lineOfTranscript(
+        newMessages,
+        index,
+        newMessages.elementAtOrNull(index + 1)?.$1 ?? DateTime.now(),
+      ),
     );
   }
 
@@ -120,20 +124,33 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
       itemCount: messageHistory.length,
       itemBuilder: (BuildContext context, int index) {
         if (index == messageHistory.length - 1) _loadMoreHistory();
-        return lineOfTranscript(messageHistory, index);
+        return lineOfTranscript(
+          messageHistory,
+          index,
+          index == 0 ? newMessages.firstOrNull?.$1 ?? DateTime.now() : messageHistory[index - 1].$1,
+        );
       },
     );
   }
 
-  Widget lineOfTranscript(List<(DateTime, String)> list, int index) {
-    final (timestamp, messageText) = list[index];
-    var paddingTop = 0.0;
-    if (list.length > index + 1) {
-      paddingTop = 20.0;
-    }
+  Widget lineOfTranscript(List<(DateTime, String, int)> list, int index, DateTime nextTime) {
+    final (timestamp, messageText, id) = list[index];
+    var paddingBottom = 0.0;
+    if (timestamp.millisecondsSinceEpoch + 60 * 1000 < nextTime.millisecondsSinceEpoch) paddingBottom = 25.0;
     final text = displayTextField(
-      controller: TextEditingController(text: '${timestamp.toNiceString()}: ${messageText.toLowerCase()}'),
-      padding: EdgeInsets.only(top: paddingTop),
+      controller: TextEditingController(text: '${timestamp.toNiceString()}: ${messageText.trim().toLowerCase()}'),
+      padding: EdgeInsets.only(bottom: paddingBottom),
+      onChanged: (v) {
+        final realTextIndex = v.indexOf(': ');
+        if (realTextIndex == -1) {
+          dbDeleteMessage(id);
+          setState(() => list.removeAt(index));
+        } else {
+          final newText = v.substring(realTextIndex + 2).trim();
+          dbEditMessage(id, newText);
+          list[index] = (timestamp, newText, id);
+        }
+      },
     );
     return text;
   }
@@ -169,8 +186,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     if (text.isNotEmpty) newText = '${timestamp.toNiceString()}: ${text.toLowerCase()}';
 
     if (isEndpoint && text.isNotEmpty) {
-      dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
-      setState(() => newMessages.add((timestamp, text)));
+      final id = dbInsertMessage(timestamp.millisecondsSinceEpoch, text);
+      setState(() => newMessages.add((timestamp, text, id)));
       newText = '';
     }
 
@@ -351,15 +368,26 @@ void dbCreate() {
 }
 
 final insertMessageSQL = db.prepare('insert into messages (timestamp, text) values (?, ?)');
-void dbInsertMessage(int timestampMillisecondsSinceEpoch, String text) {
+int dbInsertMessage(int timestampMillisecondsSinceEpoch, String text) {
   insertMessageSQL.execute([timestampMillisecondsSinceEpoch, text]);
+  return db.lastInsertRowId;
 }
 
-final getMessagesSQL = db.prepare('select timestamp, text from messages where timestamp <= ? order by timestamp desc limit 20000 offset ?');
-Iterable<(DateTime, String)> dbGetMessages({int beforeIndex = 0, DateTime? beforeTime}) {
+final getMessagesSQL = db.prepare('select timestamp, text, id from messages where timestamp <= ? order by timestamp desc limit 20000 offset ?');
+Iterable<(DateTime, String, int)> dbGetMessages({int beforeIndex = 0, DateTime? beforeTime}) {
   final beforeTimeMillis = (beforeTime ?? DateTime.now()).millisecondsSinceEpoch;
   final ResultSet results = getMessagesSQL.select([beforeTimeMillis, beforeIndex]);
-  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String)).toList();
+  return results.map((row) => (DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int), row['text'] as String, row['id'] as int)).toList();
+}
+
+final editMessageSQL = db.prepare('update messages set text = ? where id = ?');
+void dbEditMessage(int messageId, String newText) {
+  editMessageSQL.execute([newText, messageId]);
+}
+
+final deleteMessageSQL = db.prepare('delete from messages where id = ?');
+void dbDeleteMessage(int messageId) {
+  deleteMessageSQL.execute([messageId]);
 }
 
 String get databaseFilename => "total_recall.sqlite";
