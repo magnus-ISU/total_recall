@@ -23,7 +23,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   directory = await getApplicationDocumentsDirectory();
-  debugPrint(directory.path);
   dbCreate();
 
   if (isMobile) {
