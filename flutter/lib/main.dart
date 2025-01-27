@@ -11,15 +11,17 @@ import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
+// ignore: unused_import
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();
   }
-  WidgetsFlutterBinding.ensureInitialized();
   /*
   if (isMobile) {
     await initializeBackgroundService();
