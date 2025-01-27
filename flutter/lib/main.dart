@@ -15,6 +15,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite3;
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 Future<void> main() async {
+//   try {
   WidgetsFlutterBinding.ensureInitialized();
   applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
@@ -27,8 +28,13 @@ Future<void> main() async {
     await initializeBackgroundService();
   }
   */
-
   runApp(const TotalRecallUI());
+  /*
+  } catch (e, stackTrace) {
+    final initializationError = 'Initialization failed: $e\n\nStack trace: $stackTrace';
+    runApp(Text(initializationError));
+  }
+  */
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
