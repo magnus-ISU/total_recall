@@ -1,10 +1,9 @@
-import 'dart:ui';
+// import 'dart:ui';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
-import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,15 +13,18 @@ import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 Future<void> main() async {
+  applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();
   }
   WidgetsFlutterBinding.ensureInitialized();
+  /*
   if (isMobile) {
     await initializeBackgroundService();
   }
+  */
 
   runApp(const TotalRecallUI());
 }
@@ -57,7 +59,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   final ScrollController _scrollController = ScrollController();
   late final List<(DateTime, String, int)> messageHistory;
   final List<(DateTime, String, int)> newMessages = [];
-  late final FlutterBackgroundService _service;
+//   late final FlutterBackgroundService _service;
 
   @override
   void initState() {
@@ -211,6 +213,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
 
   Future<void> _initializeApp() async {
+    /*
     if (isMobile) {
       // For mobile platforms, listen to background service updates
       _service = FlutterBackgroundService();
@@ -220,8 +223,11 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
         }
       });
     } else {
-      await beginTranscription(_updateText);
+        */
+    await beginTranscription(_updateText);
+    /*
     }
+    */
   }
 
   @override
@@ -238,7 +244,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
 
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
   const modelDir = 'assets/sherpa-onnx-streaming-zipformer-en-2023-06-26';
-  applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   return sherpa_onnx.OnlineModelConfig(
     transducer: sherpa_onnx.OnlineTransducerModelConfig(
       encoder: await copyAssetFileOnFirstRun(
@@ -355,7 +360,7 @@ Future<AudioProcessingService> beginTranscription(
 late sqlite3.Database db;
 const databaseFilename = "total_recall.sqlite";
 void dbCreate() {
-  db = sqlite3.sqlite3.open(databaseFilename);
+  db = sqlite3.sqlite3.open(p.join(applicationDocumentsDirectory.path, databaseFilename));
   db.execute('''create table if not exists messages (
     text text not null,
     timestamp integer not null,
@@ -390,6 +395,7 @@ void dbDeleteMessage(int messageId) {
 // Mobile background services
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 const notificationChannelId = 'transcription_service';
 const notificationId = 888;
 Future<void> initializeBackgroundService() async {
@@ -465,6 +471,8 @@ void onMobileStart(ServiceInstance service) async {
     service.stopSelf();
   });
 }
+
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Misc
