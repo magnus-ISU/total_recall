@@ -1,21 +1,22 @@
-// import 'dart:ui';
+import 'dart:ui';
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
-// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'dart:async';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
-import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 // ignore: unused_import
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 Future<void> main() async {
-//   try {
   WidgetsFlutterBinding.ensureInitialized();
   applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
@@ -23,18 +24,10 @@ Future<void> main() async {
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();
   }
-  /*
   if (isMobile) {
     await initializeBackgroundService();
   }
-  */
   runApp(const TotalRecallUI());
-  /*
-  } catch (e, stackTrace) {
-    final initializationError = 'Initialization failed: $e\n\nStack trace: $stackTrace';
-    runApp(Text(initializationError));
-  }
-  */
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +60,7 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   final ScrollController _scrollController = ScrollController();
   late final List<(DateTime, String, int)> messageHistory;
   final List<(DateTime, String, int)> newMessages = [];
-//   late final FlutterBackgroundService _service;
+  late final FlutterBackgroundService _service;
 
   @override
   void initState() {
@@ -221,7 +214,6 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
   DateTime get _beforeHistoryTime => messageHistory.firstOrNull?.$1 ?? DateTime.now();
 
   Future<void> _initializeApp() async {
-    /*
     if (isMobile) {
       // For mobile platforms, listen to background service updates
       _service = FlutterBackgroundService();
@@ -231,11 +223,8 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
         }
       });
     } else {
-        */
-    await beginTranscription(_updateText);
-    /*
+      await beginTranscription(_updateText);
     }
-    */
   }
 
   @override
@@ -403,7 +392,6 @@ void dbDeleteMessage(int messageId) {
 // Mobile background services
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 const notificationChannelId = 'transcription_service';
 const notificationId = 888;
 Future<void> initializeBackgroundService() async {
@@ -480,8 +468,6 @@ void onMobileStart(ServiceInstance service) async {
   });
 }
 
-*/
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Misc
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -494,4 +480,4 @@ extension on int {
   String get padLeft2 => toString().padLeft(2, '0');
 }
 
-bool get isMobile => false; // Platform.isAndroid || Platform.isIOS;
+bool get isMobile => Platform.isAndroid || Platform.isIOS;
