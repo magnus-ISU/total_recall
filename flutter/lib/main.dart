@@ -427,6 +427,7 @@ Future<void> initializeBackgroundService() async {
       initialNotificationTitle: 'Transcription Service',
       initialNotificationContent: 'Initializing...',
       foregroundServiceNotificationId: notificationId,
+      foregroundServiceTypes: [AndroidForegroundType.microphone],
       autoStartOnBoot: true,
     ),
   );
