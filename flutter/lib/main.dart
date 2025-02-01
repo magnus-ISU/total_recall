@@ -21,13 +21,10 @@ Future<void> main() async {
   applicationDocumentsDirectory = await getApplicationDocumentsDirectory();
   dbCreate();
 
-  if (Platform.isAndroid || Platform.isIOS) {
-    await Permission.microphone.request();
-  }
   if (isMobile) {
     await initializeBackgroundService();
   }
-  runApp(const TotalRecallUI());
+  runApp(const MyApp());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,6 +392,7 @@ void dbDeleteMessage(int messageId) {
 const notificationChannelId = 'transcription_service';
 const notificationId = 888;
 Future<void> initializeBackgroundService() async {
+  await Permission.microphone.request();
   final service = FlutterBackgroundService();
 
   // Configure notifications for Android
@@ -443,8 +441,56 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onMobileStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+//   SharedPreferences perferences = await SharedPreferences.getInstance();
+//   await preferences.setString('hello', 'world');
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  if (service is AndroidServiceInstance) {
+    service.on('setAsForeground').listen((event) {
+      service.setAsForegroundService();
+    });
+    service.on('setAsBackground').listen((event) {
+      service.setAsBackgroundService();
+    });
+  }
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+  // bring to foreground
+  Timer.periodic(const Duration(seconds: 1), (timer) async {
+    if (service is AndroidServiceInstance) {
+      if (await service.isForegroundService()) {
+        /// OPTIONAL for use custom notification
+        /// the notification id must be equals with AndroidConfiguration when you call configure() method.
+        flutterLocalNotificationsPlugin.show(
+          888,
+          'COOL SERVICE',
+          'Awesome ${DateTime.now()}',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'my_foreground',
+              'MY FOREGROUND SERVICE',
+              icon: 'ic_bg_service_small',
+              ongoing: true,
+            ),
+          ),
+        );
+        // if you don't using custom notification, uncomment this
+        service.setForegroundNotificationInfo(
+          title: "My App Service",
+          content: "Updated at ${DateTime.now()}",
+        );
+      }
+    }
+    // test using external plugin
+    service.invoke(
+      'update',
+      {
+        "current_date": DateTime.now().toIso8601String(),
+      },
+    );
+  });
 
-  await Permission.microphone.request();
+  return;
 
   final processor = await beginTranscription((text, isEndpoint) {
     if (service is AndroidServiceInstance) {
@@ -482,3 +528,113 @@ extension on int {
 }
 
 bool get isMobile => Platform.isAndroid || Platform.isIOS;
+
+// Test
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  String text = "Stop Service";
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Service App'),
+        ),
+        body: Column(
+          children: [
+            StreamBuilder<Map<String, dynamic>?>(
+              stream: FlutterBackgroundService().on('update'),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final data = snapshot.data!;
+                String? device = data["device"];
+                DateTime? date = DateTime.tryParse(data["current_date"]);
+                return Column(
+                  children: [
+                    Text(device ?? 'Unknown'),
+                    Text(date.toString()),
+                  ],
+                );
+              },
+            ),
+            ElevatedButton(
+              child: const Text("Foreground Mode"),
+              onPressed: () => FlutterBackgroundService().invoke("setAsForeground"),
+            ),
+            ElevatedButton(
+              child: const Text("Background Mode"),
+              onPressed: () => FlutterBackgroundService().invoke("setAsBackground"),
+            ),
+            ElevatedButton(
+              child: Text(text),
+              onPressed: () async {
+                final service = FlutterBackgroundService();
+                var isRunning = await service.isRunning();
+                isRunning ? service.invoke("stopService") : service.startService();
+
+                setState(() {
+                  text = isRunning ? 'Start Service' : 'Stop Service';
+                });
+              },
+            ),
+            const Expanded(
+              child: LogView(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LogView extends StatefulWidget {
+  const LogView({Key? key}) : super(key: key);
+
+  @override
+  State<LogView> createState() => _LogViewState();
+}
+
+class _LogViewState extends State<LogView> {
+  late final Timer timer;
+  List<String> logs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      //   final SharedPreferences sp = await SharedPreferences.getInstance();
+      //   await sp.reload();
+      //   logs = sp.getStringList('log') ?? [];
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: logs.length,
+      itemBuilder: (context, index) {
+        final log = logs.elementAt(index);
+        return Text(log);
+      },
+    );
+  }
+}
