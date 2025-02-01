@@ -19,8 +19,8 @@ dependencies:
     permission_handler: ^11.3.1
     flutter_background_service: ^5.1.0
     flutter_local_notifications: ^18.0.1
-    sqlite3_flutter_libs: ^0.5.29
-    sqlite3: ^2.6.0
+    sqlite3_flutter_libs: 0.5.27
+    sqlite3: ^2.7.2
 
 dev_dependencies:
     flutter_lints: ^5.0.0
